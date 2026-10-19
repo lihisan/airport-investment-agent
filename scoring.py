@@ -1,0 +1,118 @@
+"""Deterministic scoring: the numbers behind every ranking. No LLM involved.
+
+Expansion Opportunity Score (0-100) = 100 x weighted average of four KPI percentiles:
+- growth      (35%): 3-year passenger CAGR. Demand that keeps rising pays back an expansion.
+- capacity    (30%): load factor (passengers / seats). Full planes = demand pressing on capacity.
+- congestion  (20%): share of flights delayed 15+ min and average taxi-out time.
+- scale       (15%): log10 of annual passengers. A bigger market justifies a bigger investment.
+Percentiles are national: each airport is compared with every US airport above the peer threshold,
+so the same score means the same thing whatever region the analyst asks about.
+"""
+
+from __future__ import annotations
+
+import math
+
+DEFAULT_WEIGHTS = {"growth": 0.35, "capacity": 0.30, "congestion": 0.20, "scale": 0.15}
+PEER_MIN_PAX = 500_000
+TARGET_LOAD_FACTOR = 0.85
+LONG_HAUL_MI = 3000
+
+# Which raw KPIs feed each scoring component (congestion averages two).
+COMPONENT_KPIS = {"growth": ["growth_cagr"], "capacity": ["load_factor"],
+                  "congestion": ["delay_rate", "taxi_out_min"], "scale": ["log_pax"]}
+
+
+def kpis(a: dict) -> dict:
+    """Raw KPIs for one airport. A KPI is None when its data is missing."""
+    pax, base, o = a.get("pax"), a.get("pax_base"), a.get("ontime")
+    has_ontime = bool(o and o.get("departures"))
+    return {
+        "growth_cagr": (pax / base) ** (1 / 3) - 1 if pax and base else None,
+        "load_factor": pax / a["seats"] if pax and a.get("seats") else None,
+        "delay_rate": o["delayed"] / o["departures"] if has_ontime else None,
+        "taxi_out_min": o["taxi_out_sum"] / o["departures"] if has_ontime else None,
+        "log_pax": math.log10(pax) if pax else None,
+    }
+
+
+def percentile(value: float, population: list) -> float:
+    """Share of the *other* values in the population that are strictly below this value (0-1)."""
+    if len(population) <= 1:
+        return 1.0
+    return sum(x < value for x in population) / (len(population) - 1)
+
+
+def normalize_weights(weights: dict | None) -> dict:
+    """Merge custom weights over the defaults and rescale them to sum to 1."""
+    merged = dict(DEFAULT_WEIGHTS)
+    for key, value in (weights or {}).items():
+        if key not in DEFAULT_WEIGHTS:
+            raise ValueError(f"Unknown weight {key!r}; allowed: {', '.join(DEFAULT_WEIGHTS)}")
+        if value is None or value < 0:
+            raise ValueError(f"Weight {key!r} must be a number >= 0")
+        merged[key] = float(value)
+    total = sum(merged.values())
+    if total <= 0:
+        raise ValueError("At least one weight must be greater than 0")
+    return {k: v / total for k, v in merged.items()}
+
+
+def label(score: float) -> str:
+    return "strong" if score >= 70 else "moderate" if score >= 50 else "weak"
+
+
+def score_all(airports: dict, weights: dict | None = None) -> dict:
+    """Score every airport. Non-peers (too small) get score None with a reason."""
+    w = normalize_weights(weights)
+    raw = {code: kpis(a) for code, a in airports.items()}
+    peers = [c for c, a in airports.items() if (a.get("pax") or 0) >= PEER_MIN_PAX]
+    populations = {k: [raw[c][k] for c in peers if raw[c][k] is not None]
+                   for keys in COMPONENT_KPIS.values() for k in keys}
+
+    results = {}
+    for code in airports:
+        if code not in peers:
+            results[code] = {"score": None, "label": None, "confidence": None,
+                             "components": {k: None for k in COMPONENT_KPIS}, "kpis": raw[code],
+                             "reason": f"below peer threshold of {PEER_MIN_PAX:,} annual passengers"}
+            continue
+        components = {}
+        for comp, keys in COMPONENT_KPIS.items():
+            pcts = [percentile(raw[code][k], populations[k]) for k in keys if raw[code][k] is not None]
+            components[comp] = round(sum(pcts) / len(pcts), 3) if pcts else None
+        available = {k: w[k] for k, v in components.items() if v is not None}
+        # Missing components hand their weight to the available ones, proportionally.
+        total = sum(available.values())
+        score = round(100 * sum(components[k] * wk / total for k, wk in available.items()), 1) if total else 0.0
+        n = len(available)
+        results[code] = {"score": score, "label": label(score),
+                         "confidence": "high" if n == 4 else "medium" if n == 3 else "low",
+                         "components": components, "kpis": raw[code], "reason": None}
+    return results
+
+
+def seat_gap(pax: float, seats: float, target: float = TARGET_LOAD_FACTOR) -> int:
+    """Extra seats a year needed for flights to run at the target load factor (0 if none)."""
+    return max(0, round(pax / target - seats))
+
+
+def distance_mix(routes: dict, threshold_mi: float = LONG_HAUL_MI) -> dict:
+    """Share of departures flying at least threshold_mi, plus a distance breakdown."""
+    flights = sum(r["flights"] for r in routes.values())
+    long_haul = {d: r for d, r in routes.items() if r["distance"] >= threshold_mi}
+    long_flights = sum(r["flights"] for r in long_haul.values())
+    buckets = {"<800": 0, "800-1799": 0, "1800-2999": 0, "3000+": 0}
+    for r in routes.values():
+        d = r["distance"]
+        key = "<800" if d < 800 else "800-1799" if d < 1800 else "1800-2999" if d < 3000 else "3000+"
+        buckets[key] += r["flights"]
+    top = sorted(long_haul.items(), key=lambda kv: -kv[1]["flights"])[:5]
+    return {
+        "threshold_mi": threshold_mi,
+        "flights": flights,
+        "long_haul_flights": long_flights,
+        "long_haul_pct": round(100 * long_flights / flights, 1) if flights else None,
+        "buckets": buckets,
+        "top_long_haul_routes": [{"dest": d, "distance": r["distance"], "flights": r["flights"]} for d, r in top],
+    }

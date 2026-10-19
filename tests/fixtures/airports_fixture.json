@@ -1,0 +1,30 @@
+{
+  "as_of": {"t100": "2025-05..2026-04", "t100_base": "2022-05..2023-04", "ontime": "2025-08..2026-07"},
+  "sources": ["fixture"],
+  "airports": {
+    "BOS": {"name": "General Edward Lawrence Logan International Airport", "city": "Boston", "state": "MA",
+            "pax": 20000000, "pax_base": 18000000, "seats": 23000000, "departures": 200000,
+            "ontime": {"departures": 100000, "delayed": 25000, "cancelled": 1000, "taxi_out_sum": 1900000,
+                       "arr_delay_minutes": {"carrier": 100000, "weather": 50000, "nas": 200000, "security": 0, "late_aircraft": 150000},
+                       "routes": {"LAX": {"distance": 2611, "flights": 5000}, "JFK": {"distance": 187, "flights": 8000}}}},
+    "PVD": {"name": "Rhode Island T. F. Green International Airport", "city": "Providence", "state": "RI",
+            "pax": 2000000, "pax_base": 1400000, "seats": 2600000, "departures": 20000,
+            "ontime": {"departures": 10000, "delayed": 1800, "cancelled": 100, "taxi_out_sum": 140000,
+                       "arr_delay_minutes": {"carrier": 10000, "weather": 2000, "nas": 5000, "security": 0, "late_aircraft": 8000},
+                       "routes": {"ATL": {"distance": 903, "flights": 2000}}}},
+    "BDL": {"name": "Bradley International Airport", "city": "Windsor Locks", "state": "CT",
+            "pax": 3000000, "pax_base": 2800000, "seats": 3700000, "departures": 30000,
+            "ontime": {"departures": 15000, "delayed": 2700, "cancelled": 150, "taxi_out_sum": 225000,
+                       "arr_delay_minutes": {"carrier": 12000, "weather": 3000, "nas": 6000, "security": 0, "late_aircraft": 9000},
+                       "routes": {"ORD": {"distance": 783, "flights": 3000}}}},
+    "LEB": {"name": "Lebanon Municipal Airport", "city": "Lebanon", "state": "NH",
+            "pax": 20000, "pax_base": 18000, "seats": 30000, "departures": 1000, "ontime": null},
+    "NEW": {"name": "New Example Field", "city": "Worcester", "state": "MA",
+            "pax": 1000000, "pax_base": null, "seats": 1300000, "departures": 9000, "ontime": null},
+    "ANC": {"name": "Ted Stevens Anchorage International Airport", "city": "Anchorage", "state": "AK",
+            "pax": 2500000, "pax_base": 2400000, "seats": 3200000, "departures": 25000,
+            "ontime": {"departures": 40, "delayed": 8, "cancelled": 0, "taxi_out_sum": 600,
+                       "arr_delay_minutes": {"carrier": 100, "weather": 300, "nas": 50, "security": 0, "late_aircraft": 80},
+                       "routes": {"ATL": {"distance": 3417, "flights": 10}, "SEA": {"distance": 1448, "flights": 30}}}}
+  }
+}
