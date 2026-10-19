@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scoring import (DEFAULT_WEIGHTS, distance_mix, kpis, label, normalize_weights,  # noqa: E402
-                     percentile, score_all, seat_gap, years_to_ceiling)
+                     percentile, rank_stability, score_all, seat_gap, years_to_ceiling)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "airports_fixture.json"
 FIX = json.loads(FIXTURE.read_text())["airports"]
@@ -84,6 +84,23 @@ class ScoringTests(unittest.TestCase):
         self.assertIsNone(years_to_ceiling(0.80, 0.0))         # no growth: never reaches it
         self.assertIsNone(years_to_ceiling(0.80, -0.02))
         self.assertIsNone(years_to_ceiling(None, 0.05))
+
+    def test_rank_stability_is_deterministic_and_consistent(self):
+        codes = ["BOS", "PVD", "BDL", "NEW"]
+        a = rank_stability(score_all(FIX), codes, top_k=3)
+        self.assertEqual(a, rank_stability(score_all(FIX), codes, top_k=3))  # fixed seed
+        self.assertEqual(set(a), set(codes))
+        # Every scenario has exactly 3 airports in the top 3.
+        self.assertAlmostEqual(sum(r["top_k_share"] for r in a.values()), 3.0, places=6)
+        for r in a.values():
+            self.assertTrue(0 <= r["top_k_share"] <= 1)
+            self.assertTrue(1 <= r["rank_min"] <= r["rank_max"] <= 4)
+            self.assertIn(r["verdict"], {"robust", "sensitive", "rarely in top"})
+
+    def test_rank_stability_skips_unscored(self):
+        out = rank_stability(score_all(FIX), ["BOS", "LEB"], top_k=1)  # LEB is below the peer threshold
+        self.assertEqual(set(out), {"BOS"})
+        self.assertEqual(out["BOS"]["top_k_share"], 1.0)
 
     def test_labels(self):
         self.assertEqual((label(70), label(69.9), label(49.9)), ("strong", "moderate", "weak"))

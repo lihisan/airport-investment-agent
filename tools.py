@@ -207,6 +207,20 @@ class Backend:
                 "caveats": ["Percentiles are relative to all US airports with at least "
                             f"{scoring.PEER_MIN_PAX:,} annual passengers.", GROWTH_CAVEAT, ONTIME_CAVEAT]}
 
+    def ranking_robustness(self, region=None, states=None, top_k=3):
+        allowed = self._states(region, states)
+        codes = [c for c in self.airports if allowed is None or self.airports[c]["state"] in allowed]
+        top_k = max(1, int(top_k))
+        stability = scoring.rank_stability(self.scores, codes, top_k=top_k)
+        ranked = sorted(stability.items(), key=lambda kv: (-kv[1]["top_k_share"], kv[1]["rank_min"], kv[0]))
+        return {"top_k": top_k, "samples": 500,
+                "airports": [{"code": c, **s} for c, s in ranked[:10]],
+                "method": "Weights re-drawn 500 times around the defaults (Dirichlet, roughly ±10 points each, "
+                          "fixed seed); same national percentiles. top_k_share = share of scenarios in the top_k.",
+                "as_of": self.as_of,
+                "caveats": ["Tests sensitivity to the weights only, not to data errors or the choice of KPIs.",
+                            "robust = in the top_k in at least 80% of scenarios; sensitive = 20-80%."]}
+
     def compare_airports(self, codes):
         if not isinstance(codes, list) or not 2 <= len(codes) <= 6:
             raise ToolError("Give between 2 and 6 airport codes to compare.")
@@ -307,6 +321,11 @@ TOOLS = [
            "top_n": {"type": "integer", "description": "How many to return (default 10)"},
            "weights": {"type": "object", "description": "Custom weights; omitted keys keep their default",
                        "properties": {k: {"type": "number"} for k in scoring.DEFAULT_WEIGHTS}}}),
+    _tool("ranking_robustness", "How robust a regional ranking is to the choice of weights: share of 500 "
+          "weight scenarios in which each airport stays in the top_k, and its best/worst rank. "
+          "Use after rank_airports to state how certain the ranking is.",
+          {**REGION, "states": {"type": "array", "items": {"type": "string"}, "description": "Two-letter states"},
+           "top_k": {"type": "integer", "description": "Size of the top group (default 3)"}}),
     _tool("compare_airports", "Side-by-side KPIs, congestion (delay rate, taxi-out time, delay causes) "
           "and scores for 2-6 airports.",
           {"codes": {"type": "array", "items": {"type": "string"}, "description": "2-6 airport codes"}}, ["codes"]),

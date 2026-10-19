@@ -12,6 +12,7 @@ so the same score means the same thing whatever region the analyst asks about.
 from __future__ import annotations
 
 import math
+import random
 
 DEFAULT_WEIGHTS = {"growth": 0.35, "capacity": 0.30, "congestion": 0.20, "scale": 0.15}
 PEER_MIN_PAX = 500_000
@@ -102,6 +103,40 @@ def score_all(airports: dict, weights: dict | None = None) -> dict:
                          "confidence": "high" if n == 4 else "medium" if n == 3 else "low",
                          "components": components, "kpis": raw[code], "reason": None}
     return results
+
+
+def rank_stability(results: dict, codes: list, top_k: int = 3, samples: int = 500,
+                   concentration: float = 20.0, seed: int = 42) -> dict:
+    """How robust is the ranking to the choice of weights?
+
+    Percentiles don't depend on the weights, so we reuse the components from score_all and
+    re-weight them `samples` times. Weights are drawn from a Dirichlet distribution centred on the
+    defaults (higher concentration = smaller changes; 20 moves each weight by roughly ±10 points).
+    Fixed seed, so the result is deterministic. Returns, per scored airport, the share of scenarios
+    in which it ranks in the top_k and its best/worst rank.
+    """
+    rng = random.Random(seed)
+    scored = [c for c in codes if c in results and results[c]["score"] is not None]
+    stats = {c: {"top": 0, "min": len(scored), "max": 1} for c in scored}
+    keys = list(DEFAULT_WEIGHTS)
+    for _ in range(samples):
+        draws = [rng.gammavariate(DEFAULT_WEIGHTS[k] * concentration, 1) for k in keys]
+        weights = dict(zip(keys, (d / sum(draws) for d in draws)))
+        scores = {}
+        for c in scored:
+            comps = {k: v for k, v in results[c]["components"].items() if v is not None}
+            total = sum(weights[k] for k in comps)
+            scores[c] = sum(comps[k] * weights[k] for k in comps) / total
+        for rank, c in enumerate(sorted(scored, key=lambda c: (-scores[c], c)), 1):
+            stats[c]["top"] += rank <= top_k
+            stats[c]["min"] = min(stats[c]["min"], rank)
+            stats[c]["max"] = max(stats[c]["max"], rank)
+    out = {}
+    for c, s in stats.items():
+        share = round(s["top"] / samples, 3)
+        verdict = "robust" if share >= 0.8 else "sensitive" if share > 0.2 else "rarely in top"
+        out[c] = {"top_k_share": share, "rank_min": s["min"], "rank_max": s["max"], "verdict": verdict}
+    return out
 
 
 def seat_gap(pax: float, seats: float, target: float = TARGET_LOAD_FACTOR) -> int:

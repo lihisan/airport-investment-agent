@@ -95,6 +95,16 @@ class ToolTests(unittest.TestCase):
     def test_rank_unknown_region_is_error(self):
         self.assertTrue(self.b.run("rank_airports", {"region": "Atlantis"})[1])
 
+    def test_ranking_robustness_tool(self):
+        out, err = run(self.b, "ranking_robustness", {"region": "New England"})
+        self.assertFalse(err)
+        self.assertEqual(out["top_k"], 3)
+        self.assertEqual(out["samples"], 500)
+        shares = [a["top_k_share"] for a in out["airports"]]
+        self.assertEqual(shares, sorted(shares, reverse=True))
+        self.assertNotIn("LEB", [a["code"] for a in out["airports"]])
+        self.assertTrue(out["caveats"])
+
     def test_compare_needs_two(self):
         self.assertTrue(self.b.run("compare_airports", {"codes": ["BOS"]})[1])
         out, err = run(self.b, "compare_airports", {"codes": ["BOS", "PVD"]})
@@ -175,7 +185,7 @@ class ToolTests(unittest.TestCase):
         self.assertTrue(self.b.run("get_airport_metrics", {"wrong": "x"})[1])
 
     def test_tool_definitions_match_methods(self):
-        self.assertEqual(len(TOOLS), 7)
+        self.assertEqual(len(TOOLS), 8)
         for t in TOOLS:
             self.assertTrue(callable(getattr(self.b, t["name"])))
 
