@@ -205,7 +205,7 @@ answers; only the wording and reasoning quality differ.
 
 ## 7. Evaluation
 
-- **68 offline unit tests** (`python -m unittest discover tests`) cover:
+- **69 offline unit tests** (`python -m unittest discover tests`) cover:
   - fetch aggregation
   - scoring math, including missing data, bad weights and edge cases
   - every tool, including unknown airports and FAA being down
