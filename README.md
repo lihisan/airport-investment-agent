@@ -19,7 +19,7 @@ Optional: `LLM_PROVIDER=claude` with `ANTHROPIC_API_KEY` uses Claude instead of 
 ## Run
 
 ```bash
-.venv/bin/streamlit run app.py          # web chat + "how I got this answer" panel
+.venv/bin/streamlit run app.py          # web chat + "how I got this answer" panel + voice input
 .venv/bin/python chat.py --debug        # terminal chat, prints every tool call
 ```
 
@@ -28,6 +28,7 @@ Try:
 - Compare LA and Santa Ana airport congestion levels.
 - What is the percentage of long haul flights out of Anchorage airport?
 - What is the unmet flight demand in SFO airport and why?
+- Or click **🎤 Or ask by voice** and speak the question (transcribed by Whisper on Groq; the browser asks for microphone access once).
 - Follow-ups such as "What about Boston?", "Rank them again with growth weighted 50%", or "Use 2,000 miles as long-haul".
 
 ## Data
@@ -42,7 +43,7 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 ## Tests and evals
 
 ```bash
-.venv/bin/python -m unittest discover tests      # 52 offline tests, no network or API key
+.venv/bin/python -m unittest discover tests      # 55 offline tests, no network or API key
 .venv/bin/python evals/run_evals.py --repeat 2   # 8 behavioral evals against the real model
 ```
 
@@ -55,6 +56,7 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 | `llm.py` | Groq / Claude providers behind one interface, with model fallback |
 | `tools.py` | The 7 tools the agent can call |
 | `scoring.py` | Deterministic KPIs, scores, unmet demand, distance mix |
+| `voice.py` | Voice input: speech-to-text with Whisper on Groq |
 | `prompts.py`, `guardrails.py` | System prompt; prompt-injection check |
 | `scripts/fetch_data.py` | Builds the data snapshot from public sources |
 | `tests/`, `evals/` | Unit tests; behavioral evals |

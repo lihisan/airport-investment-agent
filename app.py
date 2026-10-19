@@ -1,6 +1,6 @@
 """Web chat for the agent:  streamlit run app.py
 
-Left: the conversation. Right: "How I got this answer" - every tool the agent called, with its
+Left: the conversation (type, click a sample, or ask by voice). Right: "How I got this answer" - every tool the agent called, with its
 raw output, and a score table whenever it ranked or compared airports. The table comes straight
 from the deterministic scoring code, so the analyst can check the agent's explanation against it.
 """
@@ -10,6 +10,7 @@ import json
 import streamlit as st
 
 from agent import Agent
+from voice import transcribe
 
 SAMPLE_QUESTIONS = [
     "Which airports in New England are strong candidates for terminal expansion?",
@@ -25,6 +26,7 @@ def new_conversation():
     st.session_state.agent = Agent()
     st.session_state.messages = []      # [{"role", "content"}] shown in the chat
     st.session_state.turn_traces = []   # tool calls made for each user question
+    st.session_state.voice_key = 0      # bumped after each recording so the recorder resets
 
 
 if "agent" not in st.session_state:
@@ -56,8 +58,8 @@ def score_rows(tool, output):
     return rows
 
 
-def ask(question):
-    st.session_state.messages.append({"role": "user", "content": question})
+def ask(question, shown=None):
+    st.session_state.messages.append({"role": "user", "content": shown or question})
     start = len(agent.trace)
     try:
         with st.spinner("Analyzing..."):
@@ -80,6 +82,20 @@ with chat_col:
     for m in st.session_state.messages:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
+    audio = st.audio_input("🎤 Or ask by voice", key=f"voice_{st.session_state.voice_key}")
+    if audio is not None:
+        st.session_state.voice_key += 1  # new recorder next run, so the same clip isn't sent twice
+        try:
+            with st.spinner("Transcribing..."):
+                spoken = transcribe(audio.getvalue())
+        except Exception as e:  # Whisper unavailable: typing still works
+            spoken = None
+            st.warning(f"Couldn't transcribe the recording ({type(e).__name__}). Please type your question.")
+        if spoken:
+            ask(spoken, shown=f"🎤 {spoken}")
+            st.rerun()
+        elif spoken == "":
+            st.warning("I didn't catch anything in that recording. Please try again.")
     if st.session_state.messages and st.button("New conversation"):
         new_conversation()
         st.rerun()

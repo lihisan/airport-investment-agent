@@ -28,6 +28,7 @@ scripts/fetch_data.py ──► data/airports.json ──► scoring.py ──�
 | `agent.py` | Provider-agnostic loop: model → tool calls → results → model. Caps each question at 10 steps and keeps a trace of every call. |
 | `llm.py` | Groq (default `openai/gpt-oss-120b`, with automatic fallback models) or Claude, behind one interface. |
 | `app.py` | Streamlit chat. The side panel shows every tool call and the score table behind the answer. |
+| `voice.py` | Voice input: the recording is transcribed by Whisper (`whisper-large-v3-turbo` on Groq) and then goes through the normal chat path. |
 
 **Core principle:** *the LLM decides what to ask, the code decides the answer, the LLM explains it.*
 Every number in an answer comes from a tool result.
@@ -123,6 +124,7 @@ with the caveat that international and cargo flights are excluded.
 - **Primary:** Groq `openai/gpt-oss-120b`.
 - **Automatic fallback on rate limits:** Groq `openai/gpt-oss-20b`, then `qwen/qwen3.8-27b`. Each has its own
   free-tier quota. Every new question retries the primary model first, and the UI shows which model answered.
+- **Speech-to-text:** Groq `whisper-large-v3-turbo` for voice questions. The transcript is shown in the chat, so the analyst can see what was understood.
 - **Alternative provider:** Anthropic Claude (`claude-opus-5-5`, via `LLM_PROVIDER=claude`), behind the same
   interface in `llm.py`.
 
@@ -167,7 +169,7 @@ answers; only the wording and reasoning quality differ.
 
 ## 7. Evaluation
 
-- **52 offline unit tests** (`python -m unittest discover tests`) cover:
+- **55 offline unit tests** (`python -m unittest discover tests`) cover:
   - fetch aggregation
   - scoring math, including missing data, bad weights and edge cases
   - every tool, including unknown airports and FAA being down
@@ -190,5 +192,5 @@ answers; only the wording and reasoning quality differ.
 - Origin–destination data including international and cargo traffic (BTS T-100 international segments) for a true long-haul share.
 - Demand forecasting (population, income, airline schedules) to turn growth into a capacity-gap forecast.
 - Infrastructure data (gates, runways, FAA capacity benchmarks) to replace the proxies.
-- Voice input (Groq `whisper-large-v3`).
+- Spoken answers (text-to-speech). We left these out on purpose: long answers with tables and numbers read badly aloud.
 - A guard model and larger eval sets in production.

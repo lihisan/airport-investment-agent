@@ -156,6 +156,7 @@ Not used for: data, scoring, ranking, arithmetic.
 - **Primary:** Groq `openai/gpt-oss-120b`.
 - **Automatic fallback on rate limits:** Groq `openai/gpt-oss-20b`, then `qwen/qwen3.8-27b`. Each has its own
   free-tier quota. Every new question retries the primary model first, and the UI shows which model answered.
+- **Speech-to-text:** Groq `whisper-large-v3-turbo` for voice questions.
 - **Alternative provider:** Anthropic Claude (`claude-opus-5-5`, via `LLM_PROVIDER=claude`), behind the same
   interface in `llm.py`.
 
