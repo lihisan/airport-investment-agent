@@ -144,7 +144,8 @@ friendly message.
   would become worthwhile.
 - **Safety:** read-only tools on public data for internal analysts → prompt scope rules, code-sourced
   numbers, injection check and step cap. For an external or broad deployment, add a guard model
-  (e.g. Llama Guard) as an input/output filter.
+  (e.g. Llama Guard) as an input/output filter. For off-topic detection, a calibrated classifier such as Jev
+  (TypeSafe AI) would be used first in the evals, to measure scope adherence without adding per-message latency.
 - **Proxy metrics:** load factor and delays are proxies for capacity constraint; seat_gap is a lower bound.
 
 ## 11. Where AI is used

@@ -201,7 +201,13 @@ answers; only the wording and reasoning quality differ.
 - **Safety:** these are read-only tools on public data for internal analysts, so the controls are prompt scope
   rules, code-sourced numbers, an injection check and a step cap. For an external or broad deployment we would
   add a guard model (e.g. Llama Guard or `gpt-oss-safeguard`, both on Groq) as an input/output filter, and an
-  off-topic classifier in the evals.
+  off-topic classifier. A good candidate for the classifier is **Jev** (TypeSafe AI, early access since
+  September 2026): a discriminative model that does not generate text but answers typed questions (yes/no,
+  multiple choice, scale) zero-shot, with calibrated probabilities and a confidence score. A question such
+  as "Is this request within the scope of US airport investment analysis?" returns a probability the code
+  can threshold, instead of free text the code would have to parse. We would use it first in the evals, to
+  measure how often the agent stays in scope, and only then as a runtime pre-filter, since a per-message
+  call adds latency and a dependency on a proprietary early-access API. It is not integrated in this version.
 
 ## 7. Evaluation
 
@@ -239,4 +245,5 @@ answers; only the wording and reasoning quality differ.
 - Demand forecasting (population, income, airline schedules) to turn growth into a capacity-gap forecast.
 - Infrastructure data (gates, runways, FAA capacity benchmarks) to replace the proxies.
 - Spoken answers (text-to-speech). We left these out on purpose: long answers with tables and numbers read badly aloud.
-- A guard model and larger eval sets in production.
+- A guard model and larger eval sets in production, with a calibrated scope classifier (e.g. Jev) measuring
+  off-topic handling.
