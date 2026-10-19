@@ -199,7 +199,10 @@ class Backend:
                     "confidence": scores[c]["confidence"], "components": scores[c]["components"],
                     "kpis": scores[c]["kpis"]} for i, c in enumerate(scored, 1)]
         not_scored = [c for c in codes if scores[c]["score"] is None]
-        return {"weights": {k: round(v, 3) for k, v in w.items()}, "ranking": ranking,
+        # Every default ranking carries its robustness verdict, so certainty is always reported.
+        robustness = self.ranking_robustness(region, states)["summary"] if weights is None else (
+            "Not computed for custom weights (robustness is measured around the default weights).")
+        return {"weights": {k: round(v, 3) for k, v in w.items()}, "ranking": ranking, "robustness": robustness,
                 "not_scored": {"codes": sorted(not_scored, key=lambda c: -self.airports[c]["pax"])[:10],
                                "count": len(not_scored),
                                "reason": f"below peer threshold of {scoring.PEER_MIN_PAX:,} annual passengers"},

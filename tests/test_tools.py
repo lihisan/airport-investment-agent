@@ -83,6 +83,11 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(scores, sorted(scores, reverse=True))
         self.assertIn("as_of", out)
 
+    def test_rank_includes_robustness_verdict(self):
+        out, _ = run(self.b, "rank_airports", {"region": "New England"})
+        robust, _ = run(self.b, "ranking_robustness", {"region": "New England"})
+        self.assertEqual(out["robustness"], robust["summary"])
+
     def test_rank_custom_weights(self):
         out, _ = run(self.b, "rank_airports", {"states": ["RI", "CT", "MA"], "weights": {"growth": 1, "capacity": 0, "congestion": 0, "scale": 0}})
         self.assertEqual(out["ranking"][0]["code"], "PVD")

@@ -99,7 +99,8 @@ points, fixed seed so the result is deterministic). For each airport it reports 
 which it stays in the top 3 and its best and worst rank. **Robust** means in the top 3 in at least 80% of
 scenarios; **sensitive** means 20–80%. The tool also returns a one-line verdict written in code
 ("Robust: PWM, BOS · Sensitive: BTV, HVN · ..."), because in testing the model sometimes over-generalized
-("the top three are all robust").
+("the top three are all robust"). The same verdict is attached to every default ranking, because in testing
+the model also sometimes skipped the extra tool call: what must always appear is produced by code.
 
 New England, real data:
 

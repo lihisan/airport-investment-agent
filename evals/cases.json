@@ -7,7 +7,10 @@
   "must_call": [
    "rank_airports"
   ],
-  "expect_assumptions": true
+  "expect_assumptions": true,
+  "reply_must_contain_any": [
+   "robust"
+  ]
  },
  {
   "name": "lax_sna_congestion",
@@ -73,14 +76,13 @@
  {
   "name": "ranking_robustness",
   "turns": [
-   "Which airports in New England are strong candidates for terminal expansion?",
-   "How confident are you in that ranking?"
-  ],
-  "must_call": [
-   "ranking_robustness"
+   "Rank New England airports for expansion. How confident are you in that ranking?"
   ],
   "reply_must_contain_any": [
    "sensitive"
+  ],
+  "must_call": [
+   "rank_airports"
   ]
  },
  {
