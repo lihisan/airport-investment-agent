@@ -255,3 +255,18 @@ answers; only the wording and reasoning quality differ.
 - Spoken answers (text-to-speech). We left these out on purpose: long answers with tables and numbers read badly aloud.
 - A guard model and larger eval sets in production, with a calibrated scope classifier (e.g. Jev, see Key
   tradeoffs) measuring off-topic handling.
+
+## 9. How this was built
+
+Built with Claude Code using the **superpowers** skills, a plugin that enforces a disciplined engineering
+workflow on the AI assistant:
+- brainstorming and a written design spec before any code (`docs/design-spec.md`)
+- an implementation plan
+- test-driven development: every feature starts with a failing test
+- an independent code review of the whole branch before merging (5 important findings, all fixed with tests)
+
+On top of that I ran behavioral evals against the real model.
+
+**My role:** the product and design decisions (scoring method, data sources, and what not to build, e.g.
+deepagents and Jev), reviewing every change, and verifying behavior. The evals and manual review caught
+issues the code review did not, such as the model inventing benchmarks; these were fixed in code.
