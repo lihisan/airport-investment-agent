@@ -17,6 +17,7 @@ from prompts import SYSTEM_PROMPT
 from tools import Backend
 
 MAX_STEPS = 10  # safety net: never let one question trigger an endless tool loop
+OLD_RESULT_CHARS = 300  # tool results from earlier questions are cut to this size (keeps requests small)
 
 log = logging.getLogger("agent")
 
@@ -36,6 +37,7 @@ class Agent:
             # Input guardrail: don't even send this to the model.
             return "I can only help with US airport and aviation investment analysis. What would you like to know?"
 
+        self._compact_old_tool_results()
         self.messages.append({"role": "user", "content": user_text})
 
         for _ in range(MAX_STEPS):
@@ -59,6 +61,26 @@ class Agent:
 
         return ("I couldn't complete this analysis within the step limit. "
                 "Try asking a narrower question (e.g. one airport or one region).")
+
+    def _compact_old_tool_results(self):
+        """Shorten tool results from previous questions before a new one.
+
+        The model's earlier answers stay in full (they hold the numbers it already explained), so
+        follow-ups still work, but raw tool JSON from old turns no longer fills every request.
+        Free-tier providers cap the size of a single request, so this keeps long chats working.
+        """
+        def cut(text):
+            if len(text) <= OLD_RESULT_CHARS:
+                return text
+            return text[:OLD_RESULT_CHARS - 60] + " ...[truncated; call the tool again for details]"
+
+        for m in self.messages:
+            if m.get("role") == "tool":                      # OpenAI / Groq format
+                m["content"] = cut(m["content"])
+            elif m.get("role") == "user" and isinstance(m.get("content"), list):  # Claude format
+                for block in m["content"]:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        block["content"] = cut(block["content"])
 
     def _run_tools(self, tool_calls):
         """Run every tool call the model asked for and collect the results."""

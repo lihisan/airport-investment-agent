@@ -47,6 +47,17 @@ class ToolError(Exception):
     """A tool failed in a way the model should hear about (and can recover from)."""
 
 
+def _compact(value):
+    """Round floats so tool outputs stay small: 0.06283594 -> 0.0628, 26593024.0 -> 26593024."""
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else round(value, 4)
+    if isinstance(value, dict):
+        return {k: _compact(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_compact(v) for v in value]
+    return value
+
+
 def _fetch_faa_status() -> str:
     with urllib.request.urlopen(FAA_STATUS_URL, timeout=10) as resp:
         return resp.read().decode("utf-8")
@@ -115,6 +126,27 @@ class Backend:
             caveats.append("No passenger data for the base period: growth is not scored.")
         return caveats
 
+    def _unmet_interpretation(self, code, gap, excess):
+        """Plain-language reading of the unmet-demand numbers, decided in code so the model can't misread them."""
+        k, lf = self.scores[code]["kpis"], self.scores[code]["kpis"]["load_factor"]
+        target = scoring.TARGET_LOAD_FACTOR
+        lines = [f"Load factor {lf:.1%} is below the {target:.0%} target: no seat-based gap; flights still have some "
+                 "empty seats on average." if gap == 0 else
+                 f"Load factor {lf:.1%} is above the {target:.0%} target: about {gap:,} more seats a year would be "
+                 "needed to bring it down to the target (seat-based unmet demand)."]
+        median = self.peer_median["delay_rate"]
+        if excess is not None:
+            above = k["delay_rate"] > median
+            lines.append(f"Delay rate {k['delay_rate']:.1%} is {'above' if above else 'at or below'} the peer median "
+                         f"{median:.1%}" + (f": about {excess:,} more delayed departures than the median rate would give "
+                                            "(flight-based signal of traffic the airport cannot handle on time)."
+                                            if above else ": no flight-based congestion signal."))
+            causes = self._delay_causes_pct(code) or {}
+            if causes:
+                top = max(causes, key=causes.get)
+                lines.append(f"Largest delay cause: {top} ({causes[top]}% of arrival delay minutes).")
+        return lines
+
     # ---------- tools ----------
 
     def find_airports(self, region=None, state=None, query=None):
@@ -144,12 +176,15 @@ class Backend:
         codes = [c for c in self.airports if allowed is None or self.airports[c]["state"] in allowed]
         scored = sorted((c for c in codes if scores[c]["score"] is not None),
                         key=lambda c: (-scores[c]["score"], c))[:max(1, int(top_n))]
-        ranking = [{"rank": i, **self._info(c), "score": scores[c]["score"], "label": scores[c]["label"],
+        ranking = [{"rank": i, "code": c, "name": self.airports[c]["name"], "state": self.airports[c]["state"],
+                    "pax": self.airports[c]["pax"], "score": scores[c]["score"], "label": scores[c]["label"],
                     "confidence": scores[c]["confidence"], "components": scores[c]["components"],
                     "kpis": scores[c]["kpis"]} for i, c in enumerate(scored, 1)]
-        not_scored = [{"code": c, "reason": scores[c]["reason"]} for c in codes if scores[c]["score"] is None]
+        not_scored = [c for c in codes if scores[c]["score"] is None]
         return {"weights": {k: round(v, 3) for k, v in w.items()}, "ranking": ranking,
-                "not_scored": sorted(not_scored, key=lambda n: -self.airports[n["code"]]["pax"])[:15],
+                "not_scored": {"codes": sorted(not_scored, key=lambda c: -self.airports[c]["pax"])[:10],
+                               "count": len(not_scored),
+                               "reason": f"below peer threshold of {scoring.PEER_MIN_PAX:,} annual passengers"},
                 "as_of": self.as_of,
                 "caveats": ["Percentiles are relative to all US airports with at least "
                             f"{scoring.PEER_MIN_PAX:,} annual passengers.", GROWTH_CAVEAT, ONTIME_CAVEAT]}
@@ -157,7 +192,13 @@ class Backend:
     def compare_airports(self, codes):
         if not isinstance(codes, list) or not 2 <= len(codes) <= 6:
             raise ToolError("Give between 2 and 6 airport codes to compare.")
-        return {"airports": [self.get_airport_metrics(c) for c in codes], "as_of": self.as_of}
+        airports, caveats = [], []
+        for c in codes:
+            m = self.get_airport_metrics(c)
+            caveats += [f"{m['code']}: {x}" if "No " in x else x for x in m.pop("caveats") if x not in caveats]
+            m.pop("as_of")
+            airports.append(m)
+        return {"airports": airports, "as_of": self.as_of, "caveats": list(dict.fromkeys(caveats))}
 
     def distance_mix(self, code, threshold_mi=scoring.LONG_HAUL_MI):
         code = self.resolve(code)
@@ -165,7 +206,7 @@ class Backend:
         if not o:
             raise ToolError(f"No route data for {code} (no BTS On-Time flights).")
         return {"code": code, **scoring.distance_mix(o["routes"], float(threshold_mi)),
-                "as_of": self.as_of, "caveats": [ONTIME_CAVEAT]}
+                "data_period": self.as_of["ontime"], "caveats": [ONTIME_CAVEAT]}
 
     def unmet_demand(self, code):
         code = self.resolve(code)
@@ -173,13 +214,16 @@ class Backend:
         median = self.peer_median["delay_rate"]
         excess = (max(0, round(o["delayed"] - o["departures"] * median))
                   if o and o["departures"] and median is not None else None)
-        return {"code": code, "seat_gap": scoring.seat_gap(a["pax"], a["seats"]),
+        gap = scoring.seat_gap(a["pax"], a["seats"])
+        return {"code": code, "seat_gap": gap,
+                "interpretation": self._unmet_interpretation(code, gap, excess),
                 "excess_delayed_flights": excess, "delay_rate_peer_median": median,
                 "taxi_out_peer_median": self.peer_median["taxi_out_min"],
                 "pax": a["pax"], "seats": a["seats"], "load_factor": k["load_factor"],
                 "target_load_factor": scoring.TARGET_LOAD_FACTOR, "growth_cagr": k["growth_cagr"],
                 "delay_rate": k["delay_rate"], "taxi_out_min": k["taxi_out_min"],
-                "delay_causes_pct": self._delay_causes_pct(code), "as_of": self.as_of,
+                "delay_causes_pct": self._delay_causes_pct(code),
+                "data_period": {"passengers_seats": self.as_of["t100"], "flights_delays": self.as_of["ontime"]},
                 "caveats": ["Lower bound: at capacity-constrained airports suppressed demand never appears in the data.",
                             "seat_gap = extra annual seats needed for flights to run at an 85% load factor "
                             "(seat-based unmet demand).",
@@ -215,7 +259,7 @@ class Backend:
         if method is None:
             return json.dumps({"error": f"Unknown tool {name}"}), True
         try:
-            return json.dumps(method(**args), ensure_ascii=False), False
+            return json.dumps(_compact(method(**args)), ensure_ascii=False, separators=(",", ":")), False
         except (ToolError, ValueError, TypeError) as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False), True
 

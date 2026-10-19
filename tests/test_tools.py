@@ -51,7 +51,7 @@ class ToolTests(unittest.TestCase):
         self.assertFalse(err)
         codes = [r["code"] for r in out["ranking"]]
         self.assertNotIn("ANC", codes)
-        self.assertIn("LEB", [n["code"] for n in out["not_scored"]])
+        self.assertIn("LEB", out["not_scored"]["codes"])
         self.assertEqual([r["rank"] for r in out["ranking"]], list(range(1, len(codes) + 1)))
         scores = [r["score"] for r in out["ranking"]]
         self.assertEqual(scores, sorted(scores, reverse=True))
@@ -96,9 +96,30 @@ class ToolTests(unittest.TestCase):
         out, _ = run(self.b, "unmet_demand", {"code": "PVD"})
         self.assertEqual(out["excess_delayed_flights"], 0)
 
+    def test_unmet_demand_interpretation_when_no_seat_gap(self):
+        out, _ = run(self.b, "unmet_demand", {"code": "PVD"})  # LF 76.9% < 85%
+        self.assertEqual(out["seat_gap"], 0)
+        self.assertTrue(any("no seat-based gap" in line for line in out["interpretation"]))
+        out, _ = run(self.b, "unmet_demand", {"code": "BOS"})  # delay rate 25% vs median 19%
+        self.assertTrue(any("above the peer median" in line for line in out["interpretation"]))
+
+    def test_outputs_state_their_data_period(self):
+        self.assertEqual(run(self.b, "distance_mix", {"code": "ANC"})[0]["data_period"], "2025-08..2026-07")
+        out = run(self.b, "unmet_demand", {"code": "BOS"})[0]["data_period"]
+        self.assertEqual(out, {"passengers_seats": "2025-05..2026-04", "flights_delays": "2025-08..2026-07"})
+
     def test_growth_recovery_caveat(self):
         out, _ = run(self.b, "rank_airports", {"region": "New England"})
         self.assertTrue(any("COVID" in c for c in out["caveats"]))
+
+    def test_outputs_are_compact(self):
+        out, _ = self.b.run("rank_airports", {"region": "New England"})
+        self.assertLess(len(out), 3500)
+        floats = [x for x in json.loads(out, parse_float=str).__repr__().split("'") if "." in x and x.replace(".", "").replace("-", "").isdigit()]
+        self.assertTrue(all(len(f.split(".")[1]) <= 4 for f in floats), floats[:5])
+        out, _ = run(self.b, "compare_airports", {"codes": ["BOS", "PVD"]})
+        self.assertNotIn("caveats", out["airports"][0])
+        self.assertTrue(out["caveats"])
 
     def test_live_status_parses(self):
         out, _ = run(self.b, "live_status", {"code": "BOS"})

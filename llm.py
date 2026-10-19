@@ -88,7 +88,9 @@ class GroqLLM:
             try:
                 return self.client.chat.completions.create(
                     model=self.MODEL, messages=messages, tools=self.tools,
-                    tool_choice="auto", temperature=0.2, max_tokens=4096,
+                    tool_choice="auto", temperature=0.2,
+                    # Groq's free tier counts max_tokens toward a per-request token cap, so keep it modest.
+                    max_tokens=2500,
                 )
             except groq.BadRequestError as e:
                 # Groq returns 400 "tool_use_failed" when the model writes a broken
