@@ -57,6 +57,12 @@ def run_case(case):
             failures.append(f"no successful {check['tool']} output to compare with")
         elif not any(form in last for form in number_forms(outputs[-1][check["field"]])):
             failures.append(f"reply does not contain {check['field']}={outputs[-1][check['field']]} from the tool")
+    codes_check = case.get("tool_output_codes")
+    if codes_check:
+        seen = [{a["code"] for a in json.loads(t["output"]).get("airports", [])}
+                for t in agent.trace if t["tool"] == codes_check["tool"] and not t["error"]]
+        if set(codes_check["codes"]) not in seen:
+            failures.append(f"{codes_check['tool']} should compare {codes_check['codes']}, compared {seen}")
     if case.get("expect_assumptions") and not any(w in last.lower() for w in ("assumption", "limitation")):
         failures.append("reply has no assumptions/limitations section")
     return failures, called, replies

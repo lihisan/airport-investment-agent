@@ -22,6 +22,13 @@ class ScoringTests(unittest.TestCase):
         self.assertAlmostEqual(sum(w.values()), 1.0)
         self.assertGreater(w["growth"], DEFAULT_WEIGHTS["growth"])
 
+    def test_partial_weights_are_kept_exact(self):
+        w = normalize_weights({"growth": 0.5})
+        self.assertAlmostEqual(w["growth"], 0.5)
+        self.assertAlmostEqual(w["capacity"] / w["scale"], DEFAULT_WEIGHTS["capacity"] / DEFAULT_WEIGHTS["scale"])
+        with self.assertRaises(ValueError):
+            normalize_weights({"growth": 50})  # partial weights are fractions, not percents
+
     def test_bad_weights_raise(self):
         for bad in ({"price": 1}, {"growth": -1}, {k: 0 for k in DEFAULT_WEIGHTS}):
             with self.assertRaises(ValueError):

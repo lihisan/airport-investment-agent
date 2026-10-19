@@ -17,7 +17,14 @@
   "must_call": [
    "compare_airports"
   ],
-  "expect_assumptions": true
+  "expect_assumptions": true,
+  "tool_output_codes": {
+   "tool": "compare_airports",
+   "codes": [
+    "LAX",
+    "SNA"
+   ]
+  }
  },
  {
   "name": "anc_long_haul",

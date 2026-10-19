@@ -74,8 +74,9 @@ show the pattern. Refresh with `python -m scripts.fetch_data` (about 15 minutes,
 3. **Score** = 100 × Σ weight × percentile. Labels: ≥ 70 *strong*, 50–70 *moderate*, < 50 *weak*.
 4. **Missing data:** a missing component's weight is redistributed proportionally across the others, and
    the airport's **confidence** drops: high when all 4 components are present, medium with 3, low with 2 or fewer.
-5. **Custom weights:** analysts can ask, for example, "rank again with growth at 50%". The tool
-   renormalizes the weights and recomputes, still deterministically.
+5. **Custom weights:** analysts can ask, for example, "rank again with growth at 50%". The weights they
+   give are kept exactly (growth = 0.50), the other components share the remaining 50% in their default
+   ratio, and the tool returns the weights it used. The result is still deterministic.
 
 **Worked example: Boston Logan (BOS), real data**
 
@@ -156,7 +157,7 @@ with the caveat that international and cargo flights are excluded.
 
 ## 7. Evaluation
 
-- **47 offline unit tests** (`python -m unittest discover tests`) cover:
+- **52 offline unit tests** (`python -m unittest discover tests`) cover:
   - fetch aggregation
   - scoring math, including missing data, bad weights and edge cases
   - every tool, including unknown airports and FAA being down

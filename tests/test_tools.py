@@ -2,6 +2,7 @@
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -32,6 +33,26 @@ class ToolTests(unittest.TestCase):
         out, _ = run(self.b, "get_airport_metrics", {"code": "BOS"})
         self.assertEqual(set(out["peer_median"]), {"growth_cagr", "load_factor", "delay_rate", "taxi_out_min", "pax"})
         self.assertAlmostEqual(out["peer_median"]["delay_rate"], 0.19, places=3)
+
+    def test_resolve_short_names_on_real_data(self):
+        real = Backend()  # the committed snapshot
+        cases = {"LA": "LAX", "SF": "SFO", "Jackson": "JAN", "Santa Ana": "SNA", "Los Angeles": "LAX", "KSFO": "SFO"}
+        self.assertEqual({q: real.resolve(q) for q in cases}, cases)
+
+    def test_unexpected_tool_exception_becomes_error_result(self):
+        for name, args in (("rank_airports", {"weights": "abc"}), ("get_airport_metrics", {"code": 123}),
+                           ("find_airports", {"query": 5}), ("rank_airports", {"region": 5})):
+            out, err = self.b.run(name, args)
+            self.assertTrue(err, name)
+            self.assertIn("error", json.loads(out))
+
+    def test_interpretation_follows_load_factor_not_rounded_gap(self):
+        data = json.loads(FIXTURE.read_text())
+        data["airports"]["NEW"].update(pax=6, seats=7)  # LF 85.7% but seat gap rounds to 0
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(data, f)
+        out, _ = run(Backend(f.name, fetch_live=lambda: ""), "unmet_demand", {"code": "NEW"})
+        self.assertFalse(any("below" in line for line in out["interpretation"]))
 
     def test_unknown_airport_suggests(self):
         out, err = run(self.b, "get_airport_metrics", {"code": "ZZZ"})

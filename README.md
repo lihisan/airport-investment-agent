@@ -42,7 +42,7 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 ## Tests and evals
 
 ```bash
-.venv/bin/python -m unittest discover tests      # 47 offline tests, no network or API key
+.venv/bin/python -m unittest discover tests      # 52 offline tests, no network or API key
 .venv/bin/python evals/run_evals.py --repeat 2   # 8 behavioral evals against the real model
 ```
 

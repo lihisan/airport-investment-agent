@@ -44,18 +44,30 @@ def percentile(value: float, population: list) -> float:
 
 
 def normalize_weights(weights: dict | None) -> dict:
-    """Merge custom weights over the defaults and rescale them to sum to 1."""
-    merged = dict(DEFAULT_WEIGHTS)
+    """Turn custom weights into a full set that sums to 1.
+
+    All four given: rescaled proportionally. Some given: those are kept exactly (fractions, e.g.
+    {"growth": 0.5} means 50%) and the remaining defaults share what is left, in their usual ratio.
+    """
+    given = {}
     for key, value in (weights or {}).items():
         if key not in DEFAULT_WEIGHTS:
             raise ValueError(f"Unknown weight {key!r}; allowed: {', '.join(DEFAULT_WEIGHTS)}")
         if value is None or value < 0:
             raise ValueError(f"Weight {key!r} must be a number >= 0")
-        merged[key] = float(value)
-    total = sum(merged.values())
-    if total <= 0:
-        raise ValueError("At least one weight must be greater than 0")
-    return {k: v / total for k, v in merged.items()}
+        given[key] = float(value)
+    if len(given) == len(DEFAULT_WEIGHTS) or not given:
+        merged = {**DEFAULT_WEIGHTS, **given}
+        total = sum(merged.values())
+        if total <= 0:
+            raise ValueError("At least one weight must be greater than 0")
+        return {k: v / total for k, v in merged.items()}
+    used = sum(given.values())
+    if used > 1:
+        raise ValueError("Partial weights are fractions of 1 (e.g. 0.5 for 50%) and must sum to at most 1")
+    rest = {k: v for k, v in DEFAULT_WEIGHTS.items() if k not in given}
+    rest_total = sum(rest.values())
+    return {k: given[k] if k in given else (1 - used) * rest[k] / rest_total for k in DEFAULT_WEIGHTS}
 
 
 def label(score: float) -> str:

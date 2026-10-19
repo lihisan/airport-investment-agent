@@ -35,6 +35,9 @@ REGIONS = {
     "pacific": ["AK", "CA", "HI", "OR", "WA"],
 }
 
+# Common short names that would otherwise match inside longer airport names ("LA" in "Atlanta").
+ALIASES = {"LA": "LAX", "SF": "SFO", "NYC": "JFK", "NY": "JFK", "DC": "DCA", "CHI": "ORD", "VEGAS": "LAS"}
+
 ONTIME_CAVEAT = ("Delay, taxi and route data cover domestic flights of US reporting carriers only "
                  "(BTS On-Time); international and cargo flights are not included.")
 
@@ -84,19 +87,23 @@ class Backend:
 
     def resolve(self, code_or_name: str) -> str:
         """Turn 'sfo', 'KSFO' or 'San Francisco' into an IATA code."""
-        q = (code_or_name or "").strip()
+        q = str(code_or_name or "").strip()
         code = q.upper()
         if code in self.airports:
             return code
         if len(code) == 4 and code.startswith("K") and code[1:] in self.airports:
             return code[1:]
-        matches = [c for c, a in self.airports.items()
-                   if q and (q.lower() in a["name"].lower() or q.lower() == (a["city"] or "").lower())]
-        if len(matches) == 1:
-            return matches[0]
-        if len(matches) > 1:
-            # Several airports in one city (e.g. Chicago): pick the busiest, the usual meaning.
-            return max(matches, key=lambda c: self.airports[c]["pax"])
+        if ALIASES.get(code) in self.airports:
+            return ALIASES[code]
+        busiest = lambda codes: max(codes, key=lambda c: self.airports[c]["pax"])  # noqa: E731
+        # An exact city match beats a name match; several airports in one city -> the busiest, the usual meaning.
+        city = [c for c, a in self.airports.items() if q and q.lower() == (a["city"] or "").lower()]
+        if city:
+            return busiest(city)
+        # Name substrings only for real words: short queries match everything ("SF" in "Hartsfield").
+        named = [c for c, a in self.airports.items() if len(q) >= 4 and q.lower() in a["name"].lower()]
+        if named:
+            return busiest(named)
         suggestions = sorted((c for c, a in self.airports.items()
                               if q and (q[:3].upper() == c[:len(q[:3])] or q[:4].lower() in a["name"].lower())),
                              key=lambda c: -self.airports[c]["pax"])[:5]
@@ -134,7 +141,7 @@ class Backend:
         k, lf = self.scores[code]["kpis"], self.scores[code]["kpis"]["load_factor"]
         target = scoring.TARGET_LOAD_FACTOR
         lines = [f"Load factor {lf:.1%} is below the {target:.0%} target: no seat-based gap; flights still have some "
-                 "empty seats on average." if gap == 0 else
+                 "empty seats on average." if lf <= target else
                  f"Load factor {lf:.1%} is above the {target:.0%} target: about {gap:,} more seats a year would be "
                  "needed to bring it down to the target (seat-based unmet demand)."]
         median = self.peer_median["delay_rate"]
@@ -266,6 +273,8 @@ class Backend:
             return json.dumps(_compact(method(**args)), ensure_ascii=False, separators=(",", ":")), False
         except (ToolError, ValueError, TypeError) as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False), True
+        except Exception as e:  # any other bug still reaches the model as an error, never breaks the chat
+            return json.dumps({"error": f"Tool failed: {type(e).__name__}: {e}"}, ensure_ascii=False), True
 
 
 def _tool(name, description, properties=None, required=None):

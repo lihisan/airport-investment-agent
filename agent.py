@@ -37,6 +37,7 @@ class Agent:
             # Input guardrail: don't even send this to the model.
             return "I can only help with US airport and aviation investment analysis. What would you like to know?"
 
+        getattr(self.llm, "reset", lambda: None)()
         self._compact_old_tool_results()
         self.messages.append({"role": "user", "content": user_text})
 

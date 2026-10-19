@@ -63,6 +63,10 @@ class GroqLLM:
             for t in TOOLS
         ]
 
+    def reset(self):
+        """Start each new question on the primary model again (a rate limit may have been temporary)."""
+        self.model = self.MODELS[0]
+
     def call(self, system, messages):
         response = self._create([{"role": "system", "content": system}] + messages)
         choice = response.choices[0]

@@ -139,6 +139,13 @@ class ModelFallbackTests(unittest.TestCase):
         self.assertEqual(agent.reply("Rank New England"), "Answer from the fallback model.")
         self.assertEqual(llm.model, GroqLLM.MODELS[1])
 
+    def test_each_question_retries_the_primary_model(self):
+        llm = GroqLLM(client=FakeGroqClient([groq_text("one"), groq_text("two")]))
+        agent = Agent(backend=backend(), llm=llm)
+        llm.model = GroqLLM.MODELS[1]  # downgraded by an earlier rate limit
+        agent.reply("next question")
+        self.assertEqual(llm.model, GroqLLM.MODELS[0])
+
 
 class HistoryCompactionTests(unittest.TestCase):
     def test_old_tool_results_are_compacted(self):
