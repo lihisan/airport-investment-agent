@@ -15,7 +15,7 @@ tool, not investment advice**, and the agent says so.
 
 ```
 scripts/fetch_data.py ──► data/airports.json ──► scoring.py ──► tools.py ──► agent.py + llm.py ──► app.py
- (public APIs, run once)   (12-month snapshot)    (pure code)    (7 tools)    (tool-calling loop)  Streamlit chat
+ (public APIs, run once)   (12-month snapshot)    (pure code)    (8 tools)    (tool-calling loop)  Streamlit chat
                                                                     ▲                               + trace panel
                                                            FAA NAS Status API (live)
 ```
@@ -24,10 +24,11 @@ scripts/fetch_data.py ──► data/airports.json ──► scoring.py ──�
 |---|---|
 | `scripts/fetch_data.py` | Pulls the public sources and aggregates them into one small snapshot (~0.5 MB, 1,045 airports). |
 | `scoring.py` | KPIs, percentiles, Expansion Opportunity Score, seat gap, distance mix. Pure functions with no I/O and no LLM. |
-| `tools.py` | 7 read-only tools over the snapshot, plus the live FAA feed. Every tool output carries its data period and caveats, plus a code-computed interpretation where misreading is likely. |
+| `tools.py` | 8 read-only tools over the snapshot, plus the live FAA feed. Every tool output carries its data period and caveats, plus a code-computed interpretation where misreading is likely. |
 | `agent.py` | Provider-agnostic loop: model → tool calls → results → model. Caps each question at 10 steps and keeps a trace of every call. |
 | `llm.py` | Groq (default `openai/gpt-oss-120b`, with automatic fallback models) or Claude, behind one interface. |
 | `app.py` | Streamlit chat. The side panel shows every tool call and the score table behind the answer. |
+| `grounding.py` | Hallucination detector: checks that every number in an answer appears in a tool output. |
 | `voice.py` | Voice input: the recording is transcribed by Whisper (`whisper-large-v3-turbo` on Groq) and then goes through the normal chat path. |
 
 **Core principle:** *the LLM decides what to ask, the code decides the answer, the LLM explains it.*
@@ -89,6 +90,29 @@ show the pattern. Refresh with `python -m scripts.fetch_data` (about 15 minutes,
 | Scale | 21.0M enplanements | 2.1M | 0.893 | 0.15 | 13.4 |
 | **Score** | | | | | **73.0 → strong** |
 
+### Ranking robustness: how certain is a ranking?
+
+The weights are our biggest judgment call, so instead of only stating them we measure how much they matter.
+`ranking_robustness` reuses the percentiles (they don't depend on the weights) and re-ranks the airports under
+**500 weight scenarios** drawn around the defaults (Dirichlet distribution, each weight moves by roughly ±10
+points, fixed seed so the result is deterministic). For each airport it reports the share of scenarios in
+which it stays in the top 3 and its best and worst rank. **Robust** means in the top 3 in at least 80% of
+scenarios; **sensitive** means 20–80%.
+
+New England, real data:
+
+| Airport | Score | In top 3 | Rank range | Verdict |
+|---|---|---|---|---|
+| PWM | 68.9 | 96% | 1–4 | robust |
+| BOS | 73.0 | 96% | 1–4 | robust |
+| BTV | 61.8 | 51% | 1–6 | sensitive |
+| HVN | 61.2 | 40% | 1–6 | sensitive |
+| PVD | 59.0 | 15% | 1–6 | rarely in top |
+| BDL | 52.8 | 3% | 2–6 | rarely in top |
+
+So the analyst learns that "BOS and PWM" is a solid conclusion, while third place depends on how much one
+values growth versus congestion.
+
 ### Unmet demand
 
 The assignment asks about unmet demand at SFO, which isn't directly observable, so the tool reports two
@@ -99,11 +123,16 @@ signals plus a code-computed interpretation:
   It counts the traffic the airport cannot handle on time.
 - Context: growth, taxi-out time vs median, and **delay causes** (BTS categories; *NAS* = airport and
   air-traffic capacity).
+- **Capacity runway (time dimension):** `years_to_ceiling = ln(0.85 / load factor) / ln(1 + growth)`, the years
+  until planes run 85% full if demand keeps growing at the current rate and seats stay flat. It is a
+  **scenario, not a forecast**, and the agent says so. It is 0 when an airport is already at the ceiling and
+  undefined when there is no growth.
 
 At **SFO** the seat gap is **0** (load factor 82.6%), but there are **≈ 6,200 excess delayed departures a year**
 (24.1% delayed vs a 19.9% median), and **46%** of arrival-delay minutes are NAS. The constraint is runway and
 airspace capacity, not seats. Both signals are **lower bounds**: at a constrained airport, airlines can't add
-flights, so suppressed demand never appears in the data.
+flights, so suppressed demand never appears in the data. Its capacity runway is about **0.5 years** (BOS ≈ 1,
+LAX ≈ 1.8, ANC ≈ 10), which turns the ranking into an order of urgency.
 
 ### Long-haul share
 
@@ -134,6 +163,9 @@ answers; only the wording and reasoning quality differ.
 **Guardrails in code, not only in the prompt:**
 - Tools are read-only.
 - Numbers come only from tools, and tool outputs carry their own interpretation and benchmarks so the model has nothing to guess.
+- A **hallucination detector** (`grounding.py`) checks every final answer: each number must appear in a tool
+  output (allowing for the rounding shown and for fractions written as percentages), the system prompt or the
+  user's question. Anything else is shown in the UI as "not found in any tool output, please verify".
 - A prompt-injection check runs on user input.
 - Each question is capped at 10 tool steps.
 - Out-of-scope requests are declined.
@@ -143,7 +175,8 @@ answers; only the wording and reasoning quality differ.
 - **Weighted percentile score vs rule-based tiers vs a forecasting model:**
   - Percentiles are transparent, deterministic and rank within tiers.
   - Tiers are coarse.
-  - Forecasting needs much more data and validation than a day allows.
+  - Forecasting needs much more data and validation than a day allows, and the COVID break makes the 2014–2026
+    series hard to model. We added a transparent middle ground instead: the capacity-runway scenario.
   - The weights are a judgment call. They are stated, explained and adjustable per question.
 - **Snapshot + one live source vs everything live:** we chose reliability and reproducibility over freshness,
   and the data period is always shown. OpenSky (live flights) was rejected because historical data needs an account.
@@ -169,20 +202,30 @@ answers; only the wording and reasoning quality differ.
 
 ## 7. Evaluation
 
-- **55 offline unit tests** (`python -m unittest discover tests`) cover:
+- **68 offline unit tests** (`python -m unittest discover tests`) cover:
   - fetch aggregation
   - scoring math, including missing data, bad weights and edge cases
   - every tool, including unknown airports and FAA being down
   - the agent loop with a fake model, including history compaction and model fallback
-- **8 behavioral evals** against the real model (`python evals/run_evals.py --repeat 2`):
+  - ranking robustness, capacity runway and the grounding check
+- **10 behavioral evals** against the real model (`python evals/run_evals.py --repeat 2`):
   - the four assignment questions
   - a follow-up
+  - ranking robustness ("how confident are you?")
+  - capacity runway ("how soon will SFO run out of capacity?")
   - custom weights
   - an out-of-scope request
   - an unknown airport
 
   Checks include "the number in the reply equals the tool's number" and "the reply has an assumptions
-  section". Result: **8/8 in two consecutive runs.**
+  section". Every run also reports a **grounding rate**: the share of final answers in which every number
+  was found in a tool output.
+- **Results:** the original 8 cases passed 8/8 in two consecutive runs. In the latest full run of all 10, 9
+  passed; the failure turned out to be a detector bug (the model writes thousands with a narrow space,
+  "6 219"), which was fixed with a test and re-verified. In that run 6 of 10 answers were fully grounded. The
+  other 4 contained numbers the model computed itself, such as "4.2 percentage points above the median".
+  These are usually correct, but they did not come from our code, so the detector flags them for a human,
+  which is the intended behavior.
 - **What evals caught:** reading real answers exposed the model inventing a seat gap when the tool said 0, and
   quoting a made-up "national average". Both were fixed in code, by adding a computed interpretation and real
   peer medians, not just in the prompt. The evals also caught the provider's request-size limit before the demo did.

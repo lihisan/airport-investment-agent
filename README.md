@@ -45,8 +45,8 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 ## Tests and evals
 
 ```bash
-.venv/bin/python -m unittest discover tests      # 55 offline tests, no network or API key
-.venv/bin/python evals/run_evals.py --repeat 2   # 8 behavioral evals against the real model
+.venv/bin/python -m unittest discover tests      # 68 offline tests, no network or API key
+.venv/bin/python evals/run_evals.py --repeat 2   # 10 behavioral evals against the real model
 ```
 
 ## Project layout
@@ -56,8 +56,9 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 | `app.py`, `chat.py` | Web (Streamlit) and terminal chat |
 | `agent.py` | Tool-calling agent loop (step cap, trace, history compaction) |
 | `llm.py` | Groq / Claude providers behind one interface, with model fallback |
-| `tools.py` | The 7 tools the agent can call |
+| `tools.py` | The 8 tools the agent can call |
 | `scoring.py` | Deterministic KPIs, scores, unmet demand, distance mix |
+| `grounding.py` | Hallucination detector: every number in an answer must come from a tool |
 | `voice.py` | Voice input: speech-to-text with Whisper on Groq |
 | `prompts.py`, `guardrails.py` | System prompt; prompt-injection check |
 | `scripts/fetch_data.py` | Builds the data snapshot from public sources |
