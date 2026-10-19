@@ -46,9 +46,12 @@ class Turn:
 class GroqLLM:
     """Groq: very fast open models, OpenAI-compatible "chat completions" format."""
 
-    MODEL = os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
+    # Tried in order. Each model has its own free-tier quota, so when the first one hits its
+    # daily or per-minute limit the agent keeps working on the next one (and the UI says which).
+    MODELS = [os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b"), "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
 
     def __init__(self, client=None):
+        self.model = self.MODELS[0]
         if client is None:
             import groq
             client = groq.Groq()  # reads GROQ_API_KEY from env
@@ -87,11 +90,18 @@ class GroqLLM:
         for attempt in range(retries + 1):
             try:
                 return self.client.chat.completions.create(
-                    model=self.MODEL, messages=messages, tools=self.tools,
+                    model=self.model, messages=messages, tools=self.tools,
                     tool_choice="auto", temperature=0.2,
                     # Groq's free tier counts max_tokens toward a per-request token cap, so keep it modest.
                     max_tokens=2500,
                 )
+            except groq.RateLimitError:
+                # Quota used up for this model: switch to the next one and retry right away.
+                index = self.MODELS.index(self.model)
+                if index + 1 >= len(self.MODELS):
+                    raise
+                self.model = self.MODELS[index + 1]
+                return self._create(messages, retries)
             except groq.BadRequestError as e:
                 # Groq returns 400 "tool_use_failed" when the model writes a broken
                 # tool call. It's usually a one-off, so simply try again.
@@ -109,6 +119,7 @@ class ClaudeLLM:
     MODEL = "claude-opus-5-5"
 
     def __init__(self, client=None):
+        self.model = self.MODEL
         if client is None:
             import anthropic
             client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env

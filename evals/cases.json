@@ -91,8 +91,11 @@
    "How congested is XYZQ airport?"
   ],
   "reply_must_contain_any": [
+   "can't find",
+   "cannot find",
    "couldn't find",
    "could not find",
+   "unable to find",
    "not find",
    "unknown",
    "don't have",

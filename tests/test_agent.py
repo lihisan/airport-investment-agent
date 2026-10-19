@@ -122,6 +122,24 @@ class GroqLoopTests(unittest.TestCase):
         self.assertTrue(json.loads(agent.trace[0]["output"])["airports"])
 
 
+class ModelFallbackTests(unittest.TestCase):
+    def test_rate_limit_falls_back_to_next_model(self):
+        import groq
+        import httpx
+
+        def create(**kwargs):
+            if kwargs["model"] == GroqLLM.MODELS[0]:
+                response = httpx.Response(429, request=httpx.Request("POST", "https://api.groq.com"))
+                raise groq.RateLimitError("tokens per day limit", response=response, body=None)
+            return groq_text("Answer from the fallback model.")
+
+        fake = NS(chat=NS(completions=NS(create=create)))
+        llm = GroqLLM(client=fake)
+        agent = Agent(backend=backend(), llm=llm)
+        self.assertEqual(agent.reply("Rank New England"), "Answer from the fallback model.")
+        self.assertEqual(llm.model, GroqLLM.MODELS[1])
+
+
 class HistoryCompactionTests(unittest.TestCase):
     def test_old_tool_results_are_compacted(self):
         agent, fake = groq_agent([

@@ -28,6 +28,11 @@ class ToolTests(unittest.TestCase):
             self.assertEqual(self.b.resolve(q), "BOS")
         self.assertEqual(self.b.resolve("Providence"), "PVD")
 
+    def test_metrics_include_peer_medians(self):
+        out, _ = run(self.b, "get_airport_metrics", {"code": "BOS"})
+        self.assertEqual(set(out["peer_median"]), {"growth_cagr", "load_factor", "delay_rate", "taxi_out_min", "pax"})
+        self.assertAlmostEqual(out["peer_median"]["delay_rate"], 0.19, places=3)
+
     def test_unknown_airport_suggests(self):
         out, err = run(self.b, "get_airport_metrics", {"code": "ZZZ"})
         self.assertTrue(err)

@@ -73,9 +73,12 @@ class Backend:
         self.as_of = self.snapshot["as_of"]
         self.fetch_live = fetch_live or _fetch_faa_status
         self.scores = scoring.score_all(self.airports)
-        peer_kpis = [s["kpis"] for s in self.scores.values() if s["score"] is not None]
-        self.peer_median = {k: statistics.median(v) if v else None for k, v in (
-            (k, [p[k] for p in peer_kpis if p[k] is not None]) for k in ("delay_rate", "taxi_out_min"))}
+        # National benchmarks, so the agent compares with real medians instead of guessing "the average".
+        peers = [c for c, s in self.scores.items() if s["score"] is not None]
+        values = {k: [self.scores[c]["kpis"][k] for c in peers if self.scores[c]["kpis"][k] is not None]
+                  for k in ("growth_cagr", "load_factor", "delay_rate", "taxi_out_min")}
+        values["pax"] = [self.airports[c]["pax"] for c in peers]
+        self.peer_median = {k: statistics.median(v) if v else None for k, v in values.items()}
 
     # ---------- helpers ----------
 
@@ -165,7 +168,8 @@ class Backend:
         return {**self._info(code), "seats": a["seats"], "departures": a["departures"],
                 "pax_base_period": a["pax_base"], "score": s["score"], "label": s["label"],
                 "confidence": s["confidence"], "components": s["components"], "kpis": s["kpis"],
-                "not_scored_reason": s["reason"], "ontime_flights": o.get("departures"),
+                "not_scored_reason": s["reason"], "peer_median": self.peer_median,
+                "ontime_flights": o.get("departures"),
                 "cancelled": o.get("cancelled"), "delay_causes_pct": self._delay_causes_pct(code),
                 "as_of": self.as_of, "caveats": self._caveats(code) + [GROWTH_CAVEAT] + ([ONTIME_CAVEAT] if o else [])}
 
