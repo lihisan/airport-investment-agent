@@ -255,6 +255,17 @@ answers; only the wording and reasoning quality differ.
 - Spoken answers (text-to-speech). We left these out on purpose: long answers with tables and numbers read badly aloud.
 - A guard model and larger eval sets in production, with a calibrated scope classifier (e.g. Jev, see Key
   tradeoffs) measuring off-topic handling.
+- **Production engineering**, deliberately left out of a one-day assignment:
+  - **Observability:** OpenTelemetry traces of every model and tool call (latency, tokens, errors), viewed in an
+    LLM-aware backend such as Langfuse. This uses the vendor-neutral OTLP standard, so switching backends needs
+    no code change.
+  - **Deployment and CI:** a Docker image that runs anywhere, plus CI that runs the unit tests and linting on every push.
+  - **Framework runtime:** once the product needs sub-agents (e.g. one per region), long-term memory or
+    conversation summarization, move the loop to LangChain `create_agent` or Deep Agents. Our guardrails map
+    cleanly onto middleware: the injection check before the agent, the grounding check after it, and the step
+    cap and model fallback as built-ins. Until then, the minimal loop is easier to explain and to debug.
+  - **Engineering standards:** static type checking (mypy), a linter/formatter (ruff), browser end-to-end tests
+    of the UI (Playwright), and short architecture decision records (ADRs) for each major decision.
 
 ## 9. How this was built
 
