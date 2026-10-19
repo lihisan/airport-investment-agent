@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from scoring import (DEFAULT_WEIGHTS, distance_mix, kpis, label, normalize_weights,  # noqa: E402
-                     percentile, score_all, seat_gap)
+                     percentile, score_all, seat_gap, years_to_ceiling)
 
 FIXTURE = Path(__file__).parent / "fixtures" / "airports_fixture.json"
 FIX = json.loads(FIXTURE.read_text())["airports"]
@@ -76,6 +76,14 @@ class ScoringTests(unittest.TestCase):
         self.assertEqual(m["buckets"], {"<800": 0, "800-1799": 30, "1800-2999": 0, "3000+": 10})
         self.assertEqual(distance_mix(routes, 1000)["long_haul_pct"], 100.0)
         self.assertIsNone(distance_mix({})["long_haul_pct"])
+
+    def test_years_to_ceiling(self):
+        self.assertEqual(years_to_ceiling(0.80, 0.05), 1.2)    # ln(0.85/0.80) / ln(1.05) = 1.24
+        self.assertEqual(years_to_ceiling(0.826, 0.063), 0.5)
+        self.assertEqual(years_to_ceiling(0.90, 0.05), 0.0)    # already above the ceiling
+        self.assertIsNone(years_to_ceiling(0.80, 0.0))         # no growth: never reaches it
+        self.assertIsNone(years_to_ceiling(0.80, -0.02))
+        self.assertIsNone(years_to_ceiling(None, 0.05))
 
     def test_labels(self):
         self.assertEqual((label(70), label(69.9), label(49.9)), ("strong", "moderate", "weak"))

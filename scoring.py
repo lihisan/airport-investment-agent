@@ -109,6 +109,19 @@ def seat_gap(pax: float, seats: float, target: float = TARGET_LOAD_FACTOR) -> in
     return max(0, round(pax / target - seats))
 
 
+def years_to_ceiling(load_factor, growth, target: float = TARGET_LOAD_FACTOR):
+    """Capacity runway: years until load factor reaches the target if demand keeps growing at
+    `growth` a year and seats stay flat. A scenario, not a forecast. 0 if already there,
+    None if there is no growth (or no data) to get there."""
+    if load_factor is None or growth is None:
+        return None
+    if load_factor >= target:
+        return 0.0
+    if growth <= 0:
+        return None
+    return round(math.log(target / load_factor) / math.log(1 + growth), 1)
+
+
 def distance_mix(routes: dict, threshold_mi: float = LONG_HAUL_MI) -> dict:
     """Share of departures flying at least threshold_mi, plus a distance breakdown."""
     flights = sum(r["flights"] for r in routes.values())

@@ -144,6 +144,12 @@ class Backend:
                  "empty seats on average." if lf <= target else
                  f"Load factor {lf:.1%} is above the {target:.0%} target: about {gap:,} more seats a year would be "
                  "needed to bring it down to the target (seat-based unmet demand)."]
+        runway = scoring.years_to_ceiling(lf, k["growth_cagr"])
+        if runway == 0:
+            lines.append(f"Capacity runway: already at or above the {target:.0%} load-factor ceiling.")
+        elif runway is not None:
+            lines.append(f"Capacity runway (scenario, not a forecast): at {k['growth_cagr']:.1%} yearly growth and "
+                         f"flat seats, load factor would reach {target:.0%} in about {runway} years.")
         median = self.peer_median["delay_rate"]
         if excess is not None:
             above = k["delay_rate"] > median
@@ -176,6 +182,7 @@ class Backend:
                 "pax_base_period": a["pax_base"], "score": s["score"], "label": s["label"],
                 "confidence": s["confidence"], "components": s["components"], "kpis": s["kpis"],
                 "not_scored_reason": s["reason"], "peer_median": self.peer_median,
+                "years_to_ceiling": scoring.years_to_ceiling(s["kpis"]["load_factor"], s["kpis"]["growth_cagr"]),
                 "ontime_flights": o.get("departures"),
                 "cancelled": o.get("cancelled"), "delay_causes_pct": self._delay_causes_pct(code),
                 "as_of": self.as_of, "caveats": self._caveats(code) + [GROWTH_CAVEAT] + ([ONTIME_CAVEAT] if o else [])}
@@ -227,6 +234,7 @@ class Backend:
                   if o and o["departures"] and median is not None else None)
         gap = scoring.seat_gap(a["pax"], a["seats"])
         return {"code": code, "seat_gap": gap,
+                "years_to_ceiling": scoring.years_to_ceiling(k["load_factor"], k["growth_cagr"]),
                 "interpretation": self._unmet_interpretation(code, gap, excess),
                 "excess_delayed_flights": excess, "delay_rate_peer_median": median,
                 "taxi_out_peer_median": self.peer_median["taxi_out_min"],

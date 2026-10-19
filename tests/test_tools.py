@@ -134,6 +134,15 @@ class ToolTests(unittest.TestCase):
         out = run(self.b, "unmet_demand", {"code": "BOS"})[0]["data_period"]
         self.assertEqual(out, {"passengers_seats": "2025-05..2026-04", "flights_delays": "2025-08..2026-07"})
 
+    def test_capacity_runway_in_unmet_demand_and_metrics(self):
+        out, _ = run(self.b, "unmet_demand", {"code": "PVD"})  # LF 76.9%, CAGR 12.6%
+        self.assertEqual(out["years_to_ceiling"], 0.8)
+        self.assertTrue(any("scenario, not a forecast" in line for line in out["interpretation"]))
+        out, _ = run(self.b, "unmet_demand", {"code": "BOS"})  # LF 87.0% >= 85%
+        self.assertEqual(out["years_to_ceiling"], 0.0)
+        self.assertTrue(any("already" in line for line in out["interpretation"]))
+        self.assertEqual(run(self.b, "get_airport_metrics", {"code": "PVD"})[0]["years_to_ceiling"], 0.8)
+
     def test_growth_recovery_caveat(self):
         out, _ = run(self.b, "rank_airports", {"region": "New England"})
         self.assertTrue(any("COVID" in c for c in out["caveats"]))
