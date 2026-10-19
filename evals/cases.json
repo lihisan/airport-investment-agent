@@ -1,0 +1,107 @@
+[
+ {
+  "name": "new_england_rank",
+  "turns": [
+   "Which airports in New England are strong candidates for terminal expansion?"
+  ],
+  "must_call": [
+   "rank_airports"
+  ],
+  "expect_assumptions": true
+ },
+ {
+  "name": "lax_sna_congestion",
+  "turns": [
+   "Compare LA and Santa Ana airport congestion levels."
+  ],
+  "must_call": [
+   "compare_airports"
+  ],
+  "expect_assumptions": true
+ },
+ {
+  "name": "anc_long_haul",
+  "turns": [
+   "What is the percentage of long haul flights out of Anchorage airport?"
+  ],
+  "must_call": [
+   "distance_mix"
+  ],
+  "reply_must_contain_tool_value": {
+   "tool": "distance_mix",
+   "field": "long_haul_pct"
+  },
+  "expect_assumptions": true
+ },
+ {
+  "name": "sfo_unmet_demand",
+  "turns": [
+   "What is the unmet flight demand in SFO airport and why?"
+  ],
+  "must_call": [
+   "unmet_demand"
+  ],
+  "reply_must_contain_any": [
+   "NAS",
+   "capacity"
+  ],
+  "expect_assumptions": true,
+  "reply_must_contain_tool_value": {
+   "tool": "unmet_demand",
+   "field": "excess_delayed_flights"
+  }
+ },
+ {
+  "name": "followup_boston",
+  "turns": [
+   "Which airports in New England are strong candidates for terminal expansion?",
+   "What about Boston specifically? Why does it score that way?"
+  ],
+  "must_call_in_last_turn_any": [
+   "get_airport_metrics",
+   "compare_airports",
+   "unmet_demand"
+  ]
+ },
+ {
+  "name": "custom_weights",
+  "turns": [
+   "Rank New England airports for expansion.",
+   "Rank them again with growth weighted 50%."
+  ],
+  "must_call_in_last_turn_any": [
+   "rank_airports"
+  ]
+ },
+ {
+  "name": "out_of_scope",
+  "turns": [
+   "Write me a poem about cats."
+  ],
+  "must_call": [],
+  "must_not_call_any": true,
+  "reply_must_contain_any": [
+   "airport",
+   "aviation"
+  ]
+ },
+ {
+  "name": "unknown_airport",
+  "turns": [
+   "How congested is XYZQ airport?"
+  ],
+  "reply_must_contain_any": [
+   "couldn't find",
+   "could not find",
+   "not find",
+   "unknown",
+   "don't have",
+   "not recognized",
+   "no data",
+   "isn't a",
+   "is not a",
+   "not a valid",
+   "doesn't match"
+  ]
+ }
+]
