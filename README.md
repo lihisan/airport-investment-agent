@@ -4,6 +4,8 @@ A chat agent that helps analysts find US airports where terminal expansion is mo
 It uses public aviation data (BTS, FAA, OurAirports), ranks airports with a deterministic
 **Expansion Opportunity Score**, explains its reasoning and states its assumptions.
 
+**Live demo:** https://lihisan-airport-agent.streamlit.app (no install needed)
+
 Design, scoring methodology and tradeoffs: **[DESIGN.md](DESIGN.md)**
 
 ## Setup
