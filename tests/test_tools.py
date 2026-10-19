@@ -104,6 +104,12 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(shares, sorted(shares, reverse=True))
         self.assertNotIn("LEB", [a["code"] for a in out["airports"]])
         self.assertTrue(out["caveats"])
+        # A code-written verdict, so the model doesn't over-generalize ("the top 3 are all robust").
+        groups = {a["verdict"]: [] for a in out["airports"]}
+        for a in out["airports"]:
+            groups[a["verdict"]].append(a["code"])
+        for verdict, codes in groups.items():
+            self.assertIn(f"{verdict.capitalize()}: {', '.join(codes)}", out["summary"])
 
     def test_compare_needs_two(self):
         self.assertTrue(self.b.run("compare_airports", {"codes": ["BOS"]})[1])

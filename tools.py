@@ -212,9 +212,14 @@ class Backend:
         codes = [c for c in self.airports if allowed is None or self.airports[c]["state"] in allowed]
         top_k = max(1, int(top_k))
         stability = scoring.rank_stability(self.scores, codes, top_k=top_k)
-        ranked = sorted(stability.items(), key=lambda kv: (-kv[1]["top_k_share"], kv[1]["rank_min"], kv[0]))
-        return {"top_k": top_k, "samples": 500,
-                "airports": [{"code": c, **s} for c, s in ranked[:10]],
+        ranked = sorted(stability.items(), key=lambda kv: (-kv[1]["top_k_share"], kv[1]["rank_min"], kv[0]))[:10]
+        groups = {}
+        for c, s in ranked:
+            groups.setdefault(s["verdict"], []).append(c)
+        summary = " · ".join(f"{v.capitalize()}: {', '.join(groups[v])}"
+                             for v in ("robust", "sensitive", "rarely in top") if v in groups)
+        return {"top_k": top_k, "samples": 500, "summary": summary,
+                "airports": [{"code": c, **s} for c, s in ranked],
                 "method": "Weights re-drawn 500 times around the defaults (Dirichlet, roughly ±10 points each, "
                           "fixed seed); same national percentiles. top_k_share = share of scenarios in the top_k.",
                 "as_of": self.as_of,

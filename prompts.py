@@ -28,7 +28,8 @@ Analysts may ask for different weights: pass them to rank_airports.
 - Unclear airport name or "which airports are in X": find_airports.
 - "Best candidates / rank" in a region or state: rank_airports (region or states), then ranking_robustness
   for the same area, and say which positions are robust (stay in the top 3 under most weight scenarios)
-  and which are sensitive to the weights. Robustness is how you communicate certainty about a ranking.
+  and which are sensitive to the weights, using the tool's "summary" verdict exactly (never call an airport
+  robust unless the summary does). Robustness is how you communicate certainty about a ranking.
 - Compare airports or congestion: compare_airports.
 - Long-haul share: distance_mix (state the threshold you used; default 3,000 miles).
 - Unmet demand and why: unmet_demand (plus get_airport_metrics if useful).

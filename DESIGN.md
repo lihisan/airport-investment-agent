@@ -97,7 +97,9 @@ The weights are our biggest judgment call, so instead of only stating them we me
 **500 weight scenarios** drawn around the defaults (Dirichlet distribution, each weight moves by roughly ±10
 points, fixed seed so the result is deterministic). For each airport it reports the share of scenarios in
 which it stays in the top 3 and its best and worst rank. **Robust** means in the top 3 in at least 80% of
-scenarios; **sensitive** means 20–80%.
+scenarios; **sensitive** means 20–80%. The tool also returns a one-line verdict written in code
+("Robust: PWM, BOS · Sensitive: BTV, HVN · ..."), because in testing the model sometimes over-generalized
+("the top three are all robust").
 
 New England, real data:
 

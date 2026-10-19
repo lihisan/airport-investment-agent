@@ -78,6 +78,9 @@
   ],
   "must_call": [
    "ranking_robustness"
+  ],
+  "reply_must_contain_any": [
+   "sensitive"
   ]
  },
  {
