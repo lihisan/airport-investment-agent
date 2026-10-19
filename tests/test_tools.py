@@ -88,6 +88,18 @@ class ToolTests(unittest.TestCase):
         self.assertEqual(out["seat_gap"], 529412)  # 20M / 0.85 - 23M
         self.assertTrue(any("Lower bound" in c for c in out["caveats"]))
 
+    def test_unmet_demand_flight_based_excess(self):
+        # Peers with On-Time data: BOS 0.25, PVD 0.18, BDL 0.18, ANC 0.20 -> median 0.19
+        out, _ = run(self.b, "unmet_demand", {"code": "BOS"})
+        self.assertAlmostEqual(out["delay_rate_peer_median"], 0.19, places=3)
+        self.assertEqual(out["excess_delayed_flights"], 6000)  # 25,000 - 100,000 x 0.19
+        out, _ = run(self.b, "unmet_demand", {"code": "PVD"})
+        self.assertEqual(out["excess_delayed_flights"], 0)
+
+    def test_growth_recovery_caveat(self):
+        out, _ = run(self.b, "rank_airports", {"region": "New England"})
+        self.assertTrue(any("COVID" in c for c in out["caveats"]))
+
     def test_live_status_parses(self):
         out, _ = run(self.b, "live_status", {"code": "BOS"})
         self.assertTrue(out["available"])

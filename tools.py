@@ -13,6 +13,7 @@ Only live_status calls an API at chat time (FAA's live airport status).
 from __future__ import annotations
 
 import json
+import statistics
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -38,6 +39,10 @@ ONTIME_CAVEAT = ("Delay, taxi and route data cover domestic flights of US report
                  "(BTS On-Time); international and cargo flights are not included.")
 
 
+GROWTH_CAVEAT = ("Growth compares with the base period (as_of.t100_base), when some airports - especially "
+                 "international hubs - were still recovering from COVID; part of their growth is recovery.")
+
+
 class ToolError(Exception):
     """A tool failed in a way the model should hear about (and can recover from)."""
 
@@ -57,6 +62,9 @@ class Backend:
         self.as_of = self.snapshot["as_of"]
         self.fetch_live = fetch_live or _fetch_faa_status
         self.scores = scoring.score_all(self.airports)
+        peer_kpis = [s["kpis"] for s in self.scores.values() if s["score"] is not None]
+        self.peer_median = {k: statistics.median(v) if v else None for k, v in (
+            (k, [p[k] for p in peer_kpis if p[k] is not None]) for k in ("delay_rate", "taxi_out_min"))}
 
     # ---------- helpers ----------
 
@@ -127,7 +135,7 @@ class Backend:
                 "confidence": s["confidence"], "components": s["components"], "kpis": s["kpis"],
                 "not_scored_reason": s["reason"], "ontime_flights": o.get("departures"),
                 "cancelled": o.get("cancelled"), "delay_causes_pct": self._delay_causes_pct(code),
-                "as_of": self.as_of, "caveats": self._caveats(code) + ([ONTIME_CAVEAT] if o else [])}
+                "as_of": self.as_of, "caveats": self._caveats(code) + [GROWTH_CAVEAT] + ([ONTIME_CAVEAT] if o else [])}
 
     def rank_airports(self, region=None, states=None, top_n=10, weights=None):
         allowed = self._states(region, states)
@@ -144,7 +152,7 @@ class Backend:
                 "not_scored": sorted(not_scored, key=lambda n: -self.airports[n["code"]]["pax"])[:15],
                 "as_of": self.as_of,
                 "caveats": ["Percentiles are relative to all US airports with at least "
-                            f"{scoring.PEER_MIN_PAX:,} annual passengers.", ONTIME_CAVEAT]}
+                            f"{scoring.PEER_MIN_PAX:,} annual passengers.", GROWTH_CAVEAT, ONTIME_CAVEAT]}
 
     def compare_airports(self, codes):
         if not isinstance(codes, list) or not 2 <= len(codes) <= 6:
@@ -161,14 +169,24 @@ class Backend:
 
     def unmet_demand(self, code):
         code = self.resolve(code)
-        a, k = self.airports[code], self.scores[code]["kpis"]
+        a, k, o = self.airports[code], self.scores[code]["kpis"], self.airports[code]["ontime"]
+        median = self.peer_median["delay_rate"]
+        excess = (max(0, round(o["delayed"] - o["departures"] * median))
+                  if o and o["departures"] and median is not None else None)
         return {"code": code, "seat_gap": scoring.seat_gap(a["pax"], a["seats"]),
+                "excess_delayed_flights": excess, "delay_rate_peer_median": median,
+                "taxi_out_peer_median": self.peer_median["taxi_out_min"],
                 "pax": a["pax"], "seats": a["seats"], "load_factor": k["load_factor"],
                 "target_load_factor": scoring.TARGET_LOAD_FACTOR, "growth_cagr": k["growth_cagr"],
                 "delay_rate": k["delay_rate"], "taxi_out_min": k["taxi_out_min"],
                 "delay_causes_pct": self._delay_causes_pct(code), "as_of": self.as_of,
                 "caveats": ["Lower bound: at capacity-constrained airports suppressed demand never appears in the data.",
-                            "seat_gap = extra annual seats needed for flights to run at an 85% load factor.",
+                            "seat_gap = extra annual seats needed for flights to run at an 85% load factor "
+                            "(seat-based unmet demand).",
+                            "excess_delayed_flights = delayed departures above what the national peer median delay "
+                            "rate would give, over the On-Time period (flight-based signal: traffic the airport "
+                            "cannot handle on time).",
+                            GROWTH_CAVEAT,
                             "Delay causes are minutes of arrival delay into this airport, by BTS cause category; "
                             "'nas' = National Airspace System (airport capacity, air traffic control, non-extreme weather)."]
                 + self._caveats(code)}
