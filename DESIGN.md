@@ -201,13 +201,21 @@ answers; only the wording and reasoning quality differ.
 - **Safety:** these are read-only tools on public data for internal analysts, so the controls are prompt scope
   rules, code-sourced numbers, an injection check and a step cap. For an external or broad deployment we would
   add a guard model (e.g. Llama Guard or `gpt-oss-safeguard`, both on Groq) as an input/output filter, and an
-  off-topic classifier. A good candidate for the classifier is **Jev** (TypeSafe AI, early access since
-  September 2026): a discriminative model that does not generate text but answers typed questions (yes/no,
-  multiple choice, scale) zero-shot, with calibrated probabilities and a confidence score. A question such
-  as "Is this request within the scope of US airport investment analysis?" returns a probability the code
-  can threshold, instead of free text the code would have to parse. We would use it first in the evals, to
-  measure how often the agent stays in scope, and only then as a runtime pre-filter, since a per-message
-  call adds latency and a dependency on a proprietary early-access API. It is not integrated in this version.
+  off-topic classifier.
+- **Jev as a scope guard: considered, deliberately not integrated here.**
+  - *What it is:* Jev (TypeSafe AI, released September 2026) is a discriminative model. It does not generate
+    text; it answers typed questions (yes/no, multiple choice, scale) zero-shot and returns calibrated
+    probabilities and a confidence score. Asked "Is this request within the scope of US airport investment
+    analysis?", it returns a probability the code can threshold: decline clearly off-topic requests without
+    spending an LLM call, ask a clarifying question when uncertain, and route the rest to the agent.
+  - *Why not in this project:* it is a paid API, and this assignment is built on free tiers only. The
+    risk it would reduce is also low here: internal analysts, read-only tools on public data. The prompt's
+    scope rules, the injection check and an out-of-scope eval already cover it, and the eval passes.
+  - *When it would be worth it in a real deployment:* with external or high-volume users, regulated
+    customers (banks, insurers) or an audit requirement on what the agent refuses. The cost is negligible
+    (about $0.00008 and 0.1 s per call, per the vendor), and calibrated probabilities let the code decide
+    when the agent acts on its own and when a human reviews. We would add it to the evals first, to measure
+    in-scope precision and false blocks, then as a runtime pre-filter that fails open if the API is down.
 
 ## 7. Evaluation
 
@@ -245,5 +253,5 @@ answers; only the wording and reasoning quality differ.
 - Demand forecasting (population, income, airline schedules) to turn growth into a capacity-gap forecast.
 - Infrastructure data (gates, runways, FAA capacity benchmarks) to replace the proxies.
 - Spoken answers (text-to-speech). We left these out on purpose: long answers with tables and numbers read badly aloud.
-- A guard model and larger eval sets in production, with a calibrated scope classifier (e.g. Jev) measuring
-  off-topic handling.
+- A guard model and larger eval sets in production, with a calibrated scope classifier (e.g. Jev, see Key
+  tradeoffs) measuring off-topic handling.
