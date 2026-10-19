@@ -112,12 +112,22 @@ with the caveat that international and cargo flights are excluded.
 
 ## 5. Where AI is used, and where it isn't
 
-| LLM (Groq `gpt-oss-120b`) | Deterministic code |
+| LLM | Deterministic code |
 |---|---|
 | Understanding the question and follow-ups, using conversation history | Data collection and aggregation |
 | Choosing tools and arguments (region, codes, weights, threshold) | KPIs, percentiles, scores, rankings |
 | Explaining results, structuring the answer, stating caveats | Unmet-demand and long-haul calculations |
 | Clearly labeled general context, such as runway layout | Interpretation of edge cases (e.g. "no seat gap"), benchmarks, data periods |
+
+**Models:**
+- **Primary:** Groq `openai/gpt-oss-120b`.
+- **Automatic fallback on rate limits:** Groq `openai/gpt-oss-20b`, then `qwen/qwen3.8-27b`. Each has its own
+  free-tier quota. Every new question retries the primary model first, and the UI shows which model answered.
+- **Alternative provider:** Anthropic Claude (`claude-opus-5-5`, via `LLM_PROVIDER=claude`), behind the same
+  interface in `llm.py`.
+
+All of them play the same role and use the same tools, so the numbers are identical whichever model
+answers; only the wording and reasoning quality differ.
 
 **Guardrails in code, not only in the prompt:**
 - Tools are read-only.

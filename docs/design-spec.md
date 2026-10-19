@@ -149,8 +149,18 @@ friendly message.
 
 ## 11. Where AI is used
 
-LLM (Groq `gpt-oss-120b`): understanding the question, choosing tools and parameters, explaining
-results, follow-ups. Not used for: data, scoring, ranking, arithmetic.
+LLM: understanding the question, choosing tools and parameters, explaining results, follow-ups.
+Not used for: data, scoring, ranking, arithmetic.
+
+**Models:**
+- **Primary:** Groq `openai/gpt-oss-120b`.
+- **Automatic fallback on rate limits:** Groq `openai/gpt-oss-20b`, then `qwen/qwen3.8-27b`. Each has its own
+  free-tier quota. Every new question retries the primary model first, and the UI shows which model answered.
+- **Alternative provider:** Anthropic Claude (`claude-opus-5-5`, via `LLM_PROVIDER=claude`), behind the same
+  interface in `llm.py`.
+
+All of them play the same role and use the same tools, so the numbers are identical whichever model
+answers; only the wording and reasoning quality differ.
 
 ## 12. Milestones
 
