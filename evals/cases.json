@@ -71,6 +71,29 @@
   ]
  },
  {
+  "name": "ranking_robustness",
+  "turns": [
+   "Which airports in New England are strong candidates for terminal expansion?",
+   "How confident are you in that ranking?"
+  ],
+  "must_call": [
+   "ranking_robustness"
+  ]
+ },
+ {
+  "name": "capacity_runway",
+  "turns": [
+   "How soon will SFO run out of capacity?"
+  ],
+  "must_call_in_last_turn_any": [
+   "unmet_demand",
+   "get_airport_metrics"
+  ],
+  "reply_must_contain_any": [
+   "scenario"
+  ]
+ },
+ {
   "name": "custom_weights",
   "turns": [
    "Rank New England airports for expansion.",

@@ -11,6 +11,7 @@ Which model (Groq / Claude) is decided in llm.py.
 import json
 import logging
 
+from grounding import ungrounded_numbers
 from guardrails import looks_like_injection
 from llm import make_llm
 from prompts import SYSTEM_PROMPT
@@ -28,6 +29,8 @@ class Agent:
         self.llm = llm or make_llm()
         self.messages = []  # the full conversation, the model's only "memory"
         self.trace = []     # every tool call, for debugging and evals
+        self.questions = []  # what the user asked (numbers they gave are allowed in answers)
+        self.last_unverified = []  # numbers in the last answer that no tool produced
 
     def reply(self, user_text):
         """Handle one user message and return the agent's answer."""
@@ -40,6 +43,8 @@ class Agent:
         getattr(self.llm, "reset", lambda: None)()
         self._compact_old_tool_results()
         self.messages.append({"role": "user", "content": user_text})
+        self.questions.append(user_text)
+        self.last_unverified = []
 
         for _ in range(MAX_STEPS):
             turn = self.llm.call(SYSTEM_PROMPT, self.messages)
@@ -58,6 +63,9 @@ class Agent:
             if turn.stop == "max_tokens":
                 text += "\n[answer was cut off]"
             log.info("AGENT: %s", text)
+            # Output check: every number should come from a tool, the prompt or the question.
+            self.last_unverified = ungrounded_numbers(
+                text, [t["output"] for t in self.trace], allowed_text=SYSTEM_PROMPT + " " + " ".join(self.questions))
             return text
 
         return ("I couldn't complete this analysis within the step limit. "

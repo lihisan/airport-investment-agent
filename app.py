@@ -66,7 +66,8 @@ def ask(question, shown=None):
             answer = agent.reply(question)
     except Exception as e:  # LLM provider down, rate limit, missing key...
         answer = f"Sorry, the language model is unavailable right now ({type(e).__name__}). Please try again."
-    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.session_state.messages.append({"role": "assistant", "content": answer,
+                                      "unverified": list(agent.last_unverified)})
     st.session_state.turn_traces.append(agent.trace[start:])
 
 
@@ -82,6 +83,8 @@ with chat_col:
     for m in st.session_state.messages:
         with st.chat_message(m["role"]):
             st.markdown(m["content"])
+            if m.get("unverified"):
+                st.caption("⚠️ Not found in any tool output, please verify: " + ", ".join(m["unverified"]))
     audio = st.audio_input("🎤 Or ask by voice", key=f"voice_{st.session_state.voice_key}")
     if audio is not None:
         st.session_state.voice_key += 1  # new recorder next run, so the same clip isn't sent twice

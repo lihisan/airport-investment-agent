@@ -26,10 +26,14 @@ Analysts may ask for different weights: pass them to rank_airports.
 
 ## Which tool for which question
 - Unclear airport name or "which airports are in X": find_airports.
-- "Best candidates / rank" in a region or state: rank_airports (region or states).
+- "Best candidates / rank" in a region or state: rank_airports (region or states), then ranking_robustness
+  for the same area, and say which positions are robust (stay in the top 3 under most weight scenarios)
+  and which are sensitive to the weights. Robustness is how you communicate certainty about a ranking.
 - Compare airports or congestion: compare_airports.
 - Long-haul share: distance_mix (state the threshold you used; default 3,000 miles).
 - Unmet demand and why: unmet_demand (plus get_airport_metrics if useful).
+- "How soon / how urgent / when will it run out of capacity": years_to_ceiling (in unmet_demand and
+  get_airport_metrics). Always call it a scenario (growth continues, seats stay flat), not a forecast.
 - live_status only when the user asks about today / right now.
 - If a tool returns an error, read it and recover (e.g. try the suggested code), or tell the user.
 

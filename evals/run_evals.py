@@ -2,6 +2,7 @@
 
 Each case is a scripted conversation. After it runs we check what the agent did (which tools it
 called) and what it said (e.g. that numbers match the tool output, and assumptions are stated).
+Every final answer also goes through the grounding check: numbers that no tool produced are reported.
 Models are not deterministic, so run more than once.
 Run:  python evals/run_evals.py               (all cases)
       python evals/run_evals.py anc           (only cases whose name contains "anc")
@@ -65,7 +66,7 @@ def run_case(case):
             failures.append(f"{codes_check['tool']} should compare {codes_check['codes']}, compared {seen}")
     if case.get("expect_assumptions") and not any(w in last.lower() for w in ("assumption", "limitation")):
         failures.append("reply has no assumptions/limitations section")
-    return failures, called, replies
+    return failures, called, replies, agent.last_unverified
 
 
 def main():
@@ -77,21 +78,24 @@ def main():
     passes = {c["name"]: 0 for c in selected}
     for run in range(1, args.repeat + 1):
         print(f"--- run {run}/{args.repeat}")
-        passed = 0
+        passed = grounded = 0
         for case in selected:
             try:
-                failures, called, replies = run_case(case)
+                failures, called, replies, unverified = run_case(case)
             except Exception as e:  # provider error (rate limit, request too large...) counts as a failure
-                failures, called, replies = [f"{type(e).__name__}: {str(e)[:200]}"], [], [""]
+                failures, called, replies, unverified = [f"{type(e).__name__}: {str(e)[:200]}"], [], [""], []
+            grounded += not unverified
             ok = not failures
             passed += ok
             passes[case["name"]] += ok
-            print(f"{'PASS' if ok else 'FAIL'}  {case['name']}   tools={called}")
+            print(f"{'PASS' if ok else 'FAIL'}  {case['name']}   tools={called}"
+                  + (f"   unverified numbers={unverified}" if unverified else ""))
             for f in failures:
                 print(f"      - {f}")
             if not ok:
                 print(f"      last reply: {replies[-1][:400]}")
-        print(f"{passed}/{len(selected)} passed")
+        print(f"{passed}/{len(selected)} passed; {grounded}/{len(selected)} final answers fully grounded "
+              "(every number found in a tool output)")
     if args.repeat > 1:
         print("\nPer case: " + ", ".join(f"{n} {p}/{args.repeat}" for n, p in passes.items()))
 
