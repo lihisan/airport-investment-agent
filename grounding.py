@@ -23,6 +23,15 @@ NUMBER_RE = re.compile(
 )
 
 
+THIN_SPACES = "\u202f\u2009\u00a0"  # narrow, thin and no-break spaces models use inside numbers
+
+
+def normalize_text(text):
+    """'6\u202f219' -> '6,219' (space as thousands separator) and other odd spaces -> ' '."""
+    text = re.sub(f"(?<=\\d)[{THIN_SPACES}](?=\\d{{3}}(?!\\d))", ",", text)
+    return re.sub(f"[{THIN_SPACES}]", " ", text)
+
+
 @dataclass
 class Number:
     text: str
@@ -33,7 +42,7 @@ class Number:
 
 def extract_numbers(text):
     numbers = []
-    for m in NUMBER_RE.finditer(text):
+    for m in NUMBER_RE.finditer(normalize_text(text)):
         digits, unit = m.group(1), m.group(2) or m.group(3)
         mantissa = float(digits.replace(",", ""))
         scale = SCALES.get(unit, 1.0)

@@ -16,6 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agent import Agent  # noqa: E402
+from grounding import normalize_text  # noqa: E402
 
 CASES = json.loads((Path(__file__).parent / "cases.json").read_text(encoding="utf-8"))
 
@@ -38,7 +39,8 @@ def run_case(case):
         replies.append(agent.reply(turn))
     called = [t["tool"] for t in agent.trace]
     last_called = called[last_turn_start:]
-    last = replies[-1].replace("\u2019", "'")  # models often write curly apostrophes
+    # Models often write curly apostrophes and narrow spaces as thousands separators.
+    last = normalize_text(replies[-1].replace("\u2019", "'"))
     failures = []
 
     for tool in case.get("must_call", []):
