@@ -60,4 +60,4 @@ APIs. To refresh it (about 15 minutes; monthly files are cached in `data/raw/`):
 | `prompts.py`, `guardrails.py` | System prompt; prompt-injection check |
 | `scripts/fetch_data.py` | Builds the data snapshot from public sources |
 | `tests/`, `evals/` | Unit tests; behavioral evals |
-| `docs/` | Design spec and implementation plan |
+| `docs/design-spec.md` | Original design spec written before implementation |
